@@ -1,0 +1,87 @@
+doctype html
+html(lang='en')
+
+
+
+  head
+    meta(charset='utf-8')
+    meta(http-equiv='X-UA-Compatible', content='IE=edge')
+    meta(name='viewport', content='width=device-width, initial-scale=1')
+    meta(name='description', content='')
+    meta(name='author', content='')
+    title= title + " | Nolphin"
+    // Bootstrap Core CSS
+    link(href='/css/bootstrap.min.css', rel='stylesheet')
+    // Custom CSS
+    link(href='/css/modern-business.css', rel='stylesheet')
+    // Custom Fonts
+    link(href='/font-awesome/css/font-awesome.min.css', rel='stylesheet', type='text/css')
+    // HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries
+    // WARNING: Respond.js doesn't work if you view the page via file://
+    //if lt IE 9
+      script(src='https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js')
+      script(src='https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js')
+
+
+
+  body
+
+
+    // jQuery
+    script(src='/js/jquery.js')
+    // Bootstrap Core JavaScript
+    script(src='/js/bootstrap.min.js')
+
+    // Navigation
+    nav.navbar.navbar-inverse.navbar-fixed-top(role='navigation')
+      .container
+        // Brand and toggle get grouped for better mobile display
+        .navbar-header
+          button.navbar-toggle(type='button', data-toggle='collapse', data-target='#bs-example-navbar-collapse-1')
+            span.sr-only Toggle navigation
+            span.icon-bar
+            span.icon-bar
+            span.icon-bar
+          a.navbar-brand(href='/') Nolphin
+        // Collect the nav links, forms, and other content for toggling
+        #bs-example-navbar-collapse-1.collapse.navbar-collapse
+          ul.nav.navbar-nav.navbar-right
+            li(class=(activePage === 'about' ? 'active' : ''))
+              a(href='/about') About
+            li(class=(activePage === 'nolphiner' ? 'active' : ''))
+              a(href='/nolphiner') Nolphiner
+            li(class=(activePage === 'generations' ? 'active' : '')).dropdown
+              a.dropdown-toggle(href='#', data-toggle='dropdown')
+                | Models 
+                b.caret
+              ul.dropdown-menu
+                li
+                  a(href='/generations') Generations Overview
+                li
+                  a(href='/generations/5') v5
+                li
+                  a(href='/generations/4') v4
+                li
+                  a(href='/generations/3') v3
+                li
+                  a(href='/generations/2') v2
+                li
+                  a(href='/generations/1') v1
+        // /.navbar-collapse
+      // /.container
+
+
+
+    block pagetopper
+
+
+
+    .container
+      block page
+
+      hr
+      // Footer
+      footer
+        .row
+          .col-lg-12
+            p Copyright © Nebcorp

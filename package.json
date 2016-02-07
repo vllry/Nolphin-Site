@@ -1,0 +1,17 @@
+{
+  "name": "nolphin-site",
+  "version": "0.0.1",
+  "private": false,
+  "scripts": {
+    "start": "nodejs ./bin/www"
+  },
+  "dependencies": {
+    "express": "4.13",
+    "static-favicon": "latest",
+    "morgan": "1",
+    "cookie-parser": "1",
+    "body-parser": "1",
+    "debug": "latest",
+    "jade": "1"
+  }
+}
