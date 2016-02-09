@@ -7,24 +7,21 @@ block page
   .row
     .col-lg-12
       h1.page-header
-        | One Column Portfolio
-        small Subheading
+        | Generations of Nolphins 
       ol.breadcrumb
-        li
-          a(href='index.html') Home 
         li.active Nolphin Generations
 
-  each val in [1, 2, 3, 4, 5]
+  each val in generations
     .row
       .col-md-7
         a(href='portfolio-item.html')
           img.img-responsive.img-hover(src='http://placehold.it/700x300', alt='')
       .col-md-5
-        h3= "Project " + val
-        h4 Subheading
+        h3= "Nolphin v" + val.gen
+        h4= val.info.name_full
         p
-          | Lorem ipsum dolor sit amet, consectetur adipisicing elit. Laudantium veniam exercitationem expedita laborum at voluptate. Labore, voluptates totam at aut nemo deserunt rem magni pariatur quos perspiciatis atque eveniet unde.
-        a.btn.btn-primary(href='portfolio-item.html') View Project
+          =val.info.description
+        a.btn.btn-primary(href='/generations/'+val.gen) View Models
     // /.row
     hr
 

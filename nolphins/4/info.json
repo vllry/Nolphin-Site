@@ -1,0 +1,5 @@
+{
+	"description" : "The v4 Nolphin line introduces applyForce() based flight, rather than wired thrusters. An E2 chip with the NICOLE is all you need to make anything fly.",
+	"name" : "NICOLE",
+	"name_full" : "Nebcorp Intelli-Chip of Oscilating Large Entities"
+}

@@ -7,12 +7,21 @@ block page
   .row
     .col-lg-12
       h1.page-header
-        | Two Column Portfolio
-        small Subheading
+        = "Nolphin v" + generation + " "
+        small= name
+        br
+        small= name_full
       ol.breadcrumb
         li
-          a(href='index.html') Home
-        li.active Two Column Portfolio
+          a(href='/generations') Generations 
+        li.active= "Nolphin v" + generation
+
+  .row
+    .col-lg-12
+      = description
+
+  br
+
   // /.row
   // Projects Row
   .row
