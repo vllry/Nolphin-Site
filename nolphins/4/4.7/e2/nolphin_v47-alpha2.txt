@@ -1,0 +1,267 @@
+@name Nolphin V4.7alpha Engine
+@inputs Chair:entity Prop:entity Destination:vector
+@inputs Prop2:entity Prop3:entity Prop4:entity Prop5:entity SongPitch NextSong
+@inputs W A S D Up Down OnOff ForceOff ForceOn X Y Z TargetP TargetR 
+@outputs ID Engines Speed
+@persist Roll Yaw Pitch PThrottle RThrottle P2 R2 Engines PropB:entity Driver:entity Chair:entity
+@persist ZThrust ZDiff InternalZ ZThrottle ZAdded ZAimed Z2 Throttle TopSpeed2
+@persist YForce YAdjust LocalX LocalY NotSolid FX FY FZ Yaw4
+@persist Ownerpos:vector NautomatonPause Tick ChairSpawned Instructions:array AlphaList:array PList:array
+@persist Prop2ID Prop3ID Prop4ID Prop5ID Timer Song Duration HoldSong JukeboxOn NumberOfSongs SongDurations:array SongPath:string SongList:array
+@persist YawMode TurnSpeed Friction AngFriction TopSpeed RAcceleration ZTopSpeed ZAcceleration
+@persist XYZDistance Nautomaton ZOffset RollLeaning PitchLeaning SmartZ Freecam ZGravity ZG2
+@persist StayOn AutoDetect RagdollMode Jukebox AutoChair RadiusModifier Orientation FreeSpeed FullContraption
+#Nebcorp Oscillating Levitations Processor and Highly Intellegent Nolphin
+##Version 4.7alpha, July 9th 09##
+
+if(first()) {                 ###<<< Configuration >>>###
+ 
+YawMode = 1 # 1: Friction, yaw pressure is applied (more realistic, smoother) 2: Fixed, yaw forces itself to a given angle (useful for heavy ships)
+    TurnSpeed = 1  #0.2 - 4
+Friction    = 6  #2 - 50, higher reduces effect. Controls how quickly the ship comes to a stop. Default 6
+    AngFriction = 1 #0.5 - 8, higher reduces effect. (reduce in ground-based vehicles like cars)
+ZGravity     = 0 #0: Hovercraft (default),  1-8: Z is off, Nolphin fakes low-medium gravity (Cars? Hang-gliders?)
+RadiusModifier = 1 #0.2 - 2. Normally, higher is more accurate. If stability is compromised OR for narrow ships, lower this. 
+Orientation = 1 #Alters which direction is "forward". 1:normal, -1:reversed, 2:facing right, -2:facing left
+
+TopSpeed  = 50 #2-180, in KM/H. Set to 0 for Manual Adjustments (mid-flight)
+    RAcceleration = 1 #0.2 - 4
+ZTopSpeed = 1  #0.2 - 3, The top speed going up/down.
+    ZAcceleration = 1  #0.2 - 4
+
+XYZDistance = 140 #Distance away from XYZ targets to stop at.
+Nautomaton  = 0 #Makes the Nolphin follow you around like a pet :D
+    ZOffset = 40
+
+RollLeaning  = 1  #0 disables (Left/right leaning)
+PitchLeaning = 1 #0 disables (Forward/backward leaning)
+SmartZ       = 25 #1 resets targetZ if its too distant, 0 behaves like hoverballs, snapping back to set Z.  
+Freecam      = 1 #Enables Goto-view mode while holding Shift
+    FreeSpeed = 15
+ 
+#Modes
+StayOn      = 0 #Forces it on constantly (debuggin)
+AutoDetect  = 1 #Uses whatever entity the chip is sitting on by default, as the base.
+RagdollMode = 0 #KEEP OFF LOL
+Jukebox     = 1
+AutoChair   = 1 #2 for Microchair
+FullContraption = 0 #Utilizes patented Array magickz to absorb power from every atom of your ship. ;3
+ 
+} ###<< End of Configuration >>
+ 
+#Prop:entity is wired to a source of entitydata about your ship, such as an Entity Marker
+#To use XYZ-tracking mode, wire up your desired location to the XYZ inputs, and the Nolphin will swiftly fly there.
+ 
+ 
+ 
+ 
+#Allows duping
+if(duped()) {W2 = 666, interval(300), exit()}
+if(W2 == 666) {reset()}
+
+#Finds Engine Entities
+if((first() | clk("Rediscover Engines")) & AutoDetect) {
+    timer("Rediscover Engines", 4000)
+    if(Prop) {PropB = Prop} else{PropB = entity():isWeldedTo()}
+    if(PropB) {
+        PropList = PropB:getConstraints()
+        if(PropList:maxWeight() == PropB) {PropList:remove(PropList:maxWeightIndex())}
+        if(PropList:maxWeight():mass() >= 100) {Prop2ID = PropList:maxWeight():id(), PropList:remove(PropList:maxWeightIndex())}
+        if(PropList:maxWeight():mass() >= 100) {Prop3ID = PropList:maxWeight():id(), PropList:remove(PropList:maxWeightIndex())}
+        if(PropList:maxWeight():mass() >= 100) {Prop4ID = PropList:maxWeight():id(), PropList:remove(PropList:maxWeightIndex())}
+        if(PropList:maxWeight():mass() >= 100) {Prop5ID = PropList:maxWeight():id(), PropList:remove(PropList:maxWeightIndex())}
+        PList = entity():getConstraints2()
+    }
+}
+if(!Prop) {Prop = PropB}, ID = Prop:id()
+if(AutoDetect>1) {if(!Prop2) {Prop2 = entity(Prop2ID)}, if(!Prop3 & AutoDetect>2) {Prop3 = entity(Prop3ID)}, if(!Prop4 & AutoDetect>3) {Prop4 = entity(Prop4ID)}, if(!Prop5 & AutoDetect>4) {Prop5 = entity(Prop5ID)}}
+Tick = curtime()
+
+if(Destination) {K = Destination, X = K:x(), Y = K:y(), Z = K:z()}
+if(Orientation == 2) {PRight = -Prop:forward(), PForward = -Prop:right(), Speed = toUnit("km/h", -Prop:velL():x())}
+elseif(Orientation == -2) {PRight = Prop:forward(), PForward = Prop:right(), Speed = toUnit("km/h", Prop:velL():x())}   
+elseif(Orientation == -1) {PRight = -Prop:right(), PForward = Prop:forward(), Speed = toUnit("km/h", Prop:velL():y())}  
+else{PRight = Prop:right(), PForward = -Prop:forward(), Speed = toUnit("km/h", -Prop:velL():y())}
+
+if((clk("Rediscover Engines") | first() | clk("Rechair")) & AutoDetect) {timer("Rechair", 100)
+    rangerFilter(PropB), NAPC = ranger(25):entity()
+    if(ChairSpawned<2 & AutoChair & !NAPC:isVehicle() & PropB & !Chair) {ChairSpawned++, timer("Rediscover Engines", 550)
+        Chair = spawnTempVehicle("models/Nova/jeep_seat.mdl", entity():pos() + vec(0,0,2), PForward:toAngle() + ang(0, 0, 360 - PRight:toAngle():pitch()))
+        Chair:weld(Prop), if(AutoChair == 2) {Chair:setNoCollisions(1)}}
+}
+
+#Establishes Communications
+if(Chair) {Driver = Chair:driver() if(AutoChair == 2) {Chair:setScale(vec(0.16,0.16,0.16))}} elseif(NAPC:isVehicle() & !Driver) {Driver = NAPC:driver()}
+if(Driver) {
+    if(!Driver:inVehicle()) {Driver = noentity()}
+    W = Driver:keyW(), A = Driver:keyA(), S = Driver:keyS(), D = Driver:keyD(), Up = Driver:keySpace(), Down = Driver:keyR()
+    Shift = Driver:keyShift(), Alt = Driver:keyAlt(), Mouse1 = Driver:keyMouse1(), Mouse2 = Driver:keyMouse2()
+    if(changed(Mouse2) & Mouse2 & !Alt) {Engines = !Engines, Driver:hint("Power On!"*Engines + "Power Off!"*!Engines, 3)}
+    if(changed(Driver) & Driver:inVehicle() & !(Driver:id() == Instructions:number(1) | Driver:id() == Instructions:number(2) | Driver:id() == Instructions:number(3) | Driver:id() == Instructions:number(4))) {Instructions:pushNumber(Driver:id())
+        Driver:print("                   Welcome to Nolphin!"), Driver:print("Power: Mouse2                   Movement: WASD Space/R Mouse1"),Driver:print("Self-Freezing: Alt-Mouse2   Radio: Alt-Shift"),Driver:print("Ghosting: Alt-Mouse1          Emergency Fly: Shift")}}
+
+#Active Configuration
+if(changed(lastSaid()) & Driver & lastSpoke() == Driver) {
+    Said = Driver:lastSaid():explode(" "), Said1 = Said:string(1):lower(), Said2 = Said:string(2):toNumber()
+    if(Said1:find("gravity"))      {ZGravity = Said2}
+    elseif(Said1 == "yawmode")     {YawMode = Said2, YForce = -Prop:angles():yaw()}
+    elseif(Said1 == "turnspeed")   {TurnSpeed = Said2}
+    elseif(Said1 == "topspeed")    {TopSpeed = Said2}
+    elseif(Said1 == "friction")    {Friction = Said2}
+    elseif(Said1 == "angfriction") {AngFriction = Said2}
+    elseif(Said1:find("leaning"))  {Leaning = Said2}
+    elseif(Said1:find("radius"))   {Radius = Said2}
+    elseif(Said1:find("orient"))   {Orientation = Said2}
+    elseif(Said1:find("free"))     {FreeSpeed = Said2}
+    elseif(Said1 == "jukebox" | Said1 == "radio") {JukeboxOn = !JukeboxOn}
+    elseif(Said1 == "nextsong")    {NextSong = 1}
+}
+
+#Extra Modules
+if(changed(Mouse2 + 1) & Mouse2 & Alt) {Freeze = Prop:isFrozen(), Driver:hint("We're Frozen!"*!Freeze + "We're Unfrozen!"*Freeze, 2)
+    Prop:freeze(!Freeze), if(Prop2){Prop2:freeze(!Freeze)}, if(Prop3){Prop3:freeze(!Freeze)}, if(Prop4){Prop4:freeze(!Freeze)}, if(Prop5){Prop5:freeze(!Freeze)}}
+if(changed(Mouse1) & Mouse1 & Alt) {NotSolid = !NotSolid, Driver:hint("We're Ghosted!"*NotSolid + "We're Unghosted!"*!NotSolid, 2)
+    if(NotSolid) {PList:setNotSolid(1), AlphaList = PList:getAlphaArray(), PList:setAlpha(AlphaList:clone():addNumber(-100))} 
+    else{PList:setNotSolid(0), PList:setAlpha(AlphaList)}}
+if(!Driver) {NotSolid = 0, PList:setNotSolid(0), PList:setAlpha(AlphaList)}
+if(Jukebox) {
+    gShare(1), gSetGroup("Muzak")
+    if(first()) {SongList = fileReadArray("jukeboxsongs"), SongDurations = fileReadArray("jukeboxdurations"), NumberOfSongs = SongList:count(), JukeboxOn = 0, Song = 666}
+    SongPitch = clamp(50, SongPitch + 100, 240)
+    if(entity(gGetNum("Server")):type() == "gmod_wire_expression2") {Song = gGetNum("Song"), SongPitch = gGetNum("SongPitch"), Role = "Client"}
+    else{Role = "Personal", if((Duration < Timer) | (~NextSong & NextSong) | !Song | Song == 666) {Song = randint(1, NumberOfSongs), Timer = 0}}
+    SongChanged = changed(Song)
+    if(SongChanged) {Duration = SongDurations:number(Song), SongPath = SongList:string(Song)}
+    if(changed(Shift) & Shift & Alt) {JukeboxOn = !JukeboxOn}
+    if(SongChanged & Song & JukeboxOn) {soundStop("Song", 1.5), Prop:soundPlay("Song", 0, SongPath)}
+    if(JukeboxOn) {soundPitch("Song", SongPitch)} else{soundStop("Song", 1.5)}
+    if(changed(JukeboxOn) & Role == "Personal") {Song = randint(1, NumberOfSongs), Timer = 0}}
+if(changed(Prop:isUnderWater()) & ZGravity) {if(Prop:waterLevel() > 2) {ZG2 = ZGravity, ZGravity = -2} elseif(!first()) {ZGravity = ZG2}}
+
+#Power settings
+if(~OnOff & OnOff) {Engines = !Engines}
+if(ForceOff) {Engines = 0} 
+if(StayOn | ForceOn) {Engines = 1} elseif(~ForceOn & !ForceOn) {Engines = 0}
+if(Engines | Driver) {runOnTick(1)} else{interval(500), runOnTick(0)}
+
+if(Engines) {
+#Forward Thrust
+if(TopSpeed) { TopSpeed2=0
+    For1 = (W-S)* 100
+    if(Throttle > For1) {if(For1 == 0 | (For1 == -100 & (Throttle > 0))) {Throttle -= 2.1 *RAcceleration} else{Throttle -= 0.70 *RAcceleration}}
+    elseif(For1 > Throttle) {if(For1 == 0 | (For1 == 100 & (Throttle < 0))) {Throttle += 2.1 *RAcceleration} else{Throttle += 0.70 *RAcceleration}}
+    Forward = -(Speed - (TopSpeed * (1 + Mouse1) *Throttle /100))* (W | S) }
+else{
+    if(changed(Engines + 1) & Engines) {TopSpeed2 = round(Speed*2)/2}
+    if(abs(TopSpeed2) < 10) {TopMul = 1} else{TopMul = 2}
+    if(changed(W) & W & TopSpeed2<180) {TopSpeed2 += TopMul}
+    if(changed(S) & S & TopSpeed2>-180) {TopSpeed2 -= TopMul}
+    Forward = -(Speed - TopSpeed2)
+    if(changed(TopSpeed2)) {Driver:hint("Current Engine Speed: " + toString(TopSpeed2), 2)}}
+
+#Freecam Mode
+if(Shift & Freecam)   {
+    Eye = Driver:eye(), Eye2 = (-Eye + Prop:up()):normalized()
+    if(!FX) {FX = Prop:pos():x(), FY = Prop:pos():y(), FZ = Prop:pos():z()}
+    if(W) {FX += (Eye:x() * FreeSpeed), FY += Eye:y() * FreeSpeed, FZ += Eye:z() * FreeSpeed}
+    if(S) {FX -= (Eye:x() * FreeSpeed), FY -= Eye:y() * FreeSpeed, FZ -= Eye:z() * FreeSpeed}
+    X = FX, Y = FY, Z = FZ, FreecamOn = 1 } 
+else{FX = 0, FY = 0, FZ = 0}
+
+#Additional Z
+if(RollLeaning | ZGravity == 0) {
+    Z1=(Up-Down) * ZTopSpeed *100
+    if(Z2 > Z1) {if(Z1 == 0 | (Z1 == -(ZTopSpeed *100) & (Z2 > 0))) {Z2 -= 0.84 * ZAcceleration} else{Z2 -= 0.28 * ZAcceleration}}
+    elseif(Z1 > Z2) {if(Z1 == 0 | (Z1 == (ZTopSpeed *100) & (Z2 < 0))) {Z2 += 0.84 * ZAcceleration} else{Z2 += 0.28 * ZAcceleration}}
+    if(round(Z2 / 5) == 0) {ZThrottle = 0} else{ZThrottle = Z2 / 5}
+    ZAdded += ZThrottle
+}
+
+R2 = clamp(ZThrottle, -15, 15)*3*RollLeaning
+if(PitchLeaning) {
+    P1 = (D-A) *60
+    if((P2 < P1) & (P2 > P1 + 1)) {P2 = 0} #Filters out petty decimals like 0.31
+    elseif(P2 > P1) {if(P1==0 | (A & (P2 > 0))) {P2 -= 0.9} else{P2 -= 0.3}} 
+    elseif(P1 > P2) {if(P1==0 | (D & (P2 < 0))) {P2 += 0.9} else{P2 += 0.3}}
+}
+
+Pitch = Prop:angles():pitch() - TargetP
+Roll = Prop:angles():roll() - TargetR
+FForward = 0, RForward = 0
+if(Orientation == 2) {TarP = ($Pitch*8+Pitch) - R2, TarR = ($Roll*8+Roll) + P2          FForward =-Forward}
+elseif(Orientation == -2) {TarP = ($Pitch*8+Pitch) + R2, TarR = ($Roll*8+Roll) - P2,    FForward = Forward}
+elseif(Orientation == -1) {TarP = ($Pitch*8+Pitch) - P2, TarR = ($Roll*8+Roll) - R2,    RForward =-Forward}
+else{TarP = ($Pitch*8+Pitch) + P2, TarR = ($Roll*8+Roll) + R2,                          RForward = Forward}
+
+#Nautomaton overrides normal XYZ inputs
+if(Nautomaton) {
+    YawMode = 1, SmartZ = 12, XYZDistance = max(XYZDistance, 125), Engines = 1
+    if(Prop:pos():distance(owner():pos()) > XYZDistance) {Ownerpos = owner():pos() + vec(0, 0, ZOffset), NautomatonPause = 0}
+    elseif(!NautomatonPause) {Ownerpos = vec(Prop:pos():x(), Prop:pos():y(), owner():pos():z() + ZOffset), NautomatonPause = 1}
+    X = Ownerpos:x(), Y = Ownerpos:y(), Z = Ownerpos:z()
+}
+
+#MAIN THRUST: XYZ tracking Mode
+if(Z) { 
+    if(!ZAimed) {ZAimed = Prop:pos():z()}
+    SubtractedV = clamp(vec(X - Prop:pos():x(), Y - Prop:pos():y(), Z - Prop:pos():z()), -TopSpeed*2, TopSpeed*2)
+    LocalX = SubtractedV:dot(Prop:forward())
+    LocalY = SubtractedV:dot(Prop:right())
+    LocalZ = SubtractedV:dot(Prop:up())
+    XSlow = (-($LocalX*10 + LocalX) + (Prop:velL():x() /Friction)) /2
+    YSlow = ( ($LocalY*10 + LocalY) + (Prop:velL():y() /Friction)) /2  
+    if(abs(Z - Prop:pos():z()) > SmartZ) {ZAimed += sign(Z - Prop:pos():z()) * TopSpeed/6} #7.5 more precise, 6 more practical
+    if(SmartZ) {if(ZDiff > SmartZ) {ZAimed -= (ZDiff-SmartZ)} elseif(ZDiff < -SmartZ) {ZAimed -= (ZDiff+SmartZ)}}
+    ZDiff = -Prop:pos():z() + ZAimed
+    ZThrust =  $ZDiff*10 + ZDiff 
+}
+
+if(!InternalZ) {InternalZ = Prop:pos():z() + 35}
+if(ZGravity & !FreecamOn) {InternalZ = Prop:pos():z() + 6 - ZGravity, ZAdded = 0, Z = 0}
+
+#MAIN THRUST: Friction Mode
+if(!Z) { 
+    YFriction = Prop:velL():y() / Friction
+    XFriction = Prop:velL():x() / Friction
+    if(Orientation==-2)    {YSlow=YFriction, if(XFriction<0 & !S) {XSlow=XFriction} elseif(XFriction>0 & !W) {XSlow=XFriction} else{XSlow=0}}
+    elseif(Orientation==2) {YSlow=YFriction, if(XFriction<0 & !W) {XSlow=XFriction} elseif(XFriction>0 & !S) {XSlow=XFriction} else{XSlow=0}}
+    elseif(Orientation==-1){XSlow=XFriction, if(YFriction<0 & !S) {YSlow=YFriction} elseif(YFriction>0 & !W) {YSlow=YFriction} else{YSlow=0}}
+    else                   {XSlow=XFriction, if(YFriction<0 & !W) {YSlow=YFriction} elseif(YFriction>0 & !S) {YSlow=YFriction} else{YSlow=0}}
+    if(SmartZ) {if(ZDiff > SmartZ) {ZAdded -= (ZDiff-SmartZ)} elseif(ZDiff < -SmartZ) {ZAdded -= (ZDiff+SmartZ)}}
+    ZDiff = InternalZ - Prop:pos():z() + ZAdded
+    ZThrust = ZDiff + $ZDiff * 5
+}
+
+#Yaw
+if(YawMode == 1) { #Friction based
+    TarY = (D - A)* (0.8 + abs(Prop:velL():x()) /Friction /200)*TurnSpeed + ((!A & !D) * Prop:angVel():yaw() / Friction) }
+elseif(YawMode == 2) { #Forced Yaw based
+    YForce += (D - A)* 1.4 * TurnSpeed
+    if(YForce < -179) {YForce = 179}
+    if(YForce > 179) {YForce = -179}
+    YAdjust = angnorm(Prop:angles():yaw() + YForce)
+    TarY = ($YAdjust * 10 + YAdjust) *TurnSpeed}
+elseif(YawMode == 3) { #For Nautomaton Use
+    YAdjust = angnorm(Prop:bearing(Ownerpos) + 5)
+    TarY = ($YAdjust * 10 + YAdjust)}
+else{TarY = (D - A) * TurnSpeed} #Default to basic
+
+
+#Internal Thrusters
+if(FullContraption) {
+    PList:applyNiceForce(vec(0,0,ZThrust)) #Up
+    PList:applyNiceForwardForce(-XSlow/2 + FForward*16) #X Friction + Forward/Back
+    PList:applyNiceRightForce(YSlow/2    + RForward*16) #Y Friction + Forward/Back
+    PList:applyNomAngleForce(ang(TarP, TarY, TarR) / AngFriction, RadiusModifier)
+}
+else{
+    Prop:applyNiceForce(vec(0,0,ZThrust)) #Up
+    Prop:applyNiceForwardForce(-XSlow/2 + FForward*16) #X Friction + Forward/Back
+    Prop:applyNiceRightForce(YSlow/2    + RForward*16) #Y Friction + Forward/Back
+    Prop:applyNomAngleForce(ang(TarP, TarY, TarR) / AngFriction, RadiusModifier)
+}
+}#Closes if(Engines)
+
+#Resets Variables when off
+else{ZAdded =0, InternalZ =0, Z2 =0, Throttle =0, YAdjust =0, YForce = -Prop:angles():yaw(), Forward =0, ZThrottle =0, TopSpeed2 = 0}
+if(~FreecamOn) {ZAdded = 0}

@@ -1,0 +1,150 @@
+@name Nicole
+@inputs Radius Adjust Board:entity W A S D Up Down OnOff ForceOff ForceOn X Y TargetZ
+@outputs Weight North East South West Rear Right FLSide On Off YForce TarP TarR ZThrust
+@persist Weight ForLean ForLean2 ForLean3 Roll Yaw Pitch ZThrust DiffZ InternalZ Engines ForceOn AddedZ Z3 Z4 For3 For4 Forward YForce YAdjust LocalX LocalY
+#Nebcorp automatic self-righting hovering gyrations and maneuverabilities calculation chip 
+##Version 3.31##
+#Most recent time I adjusted the date: 
+##Jan 14, 8pm##
+
+#<< Configuration >>#
+
+#0.2 - 5, Adjustable Variable that increases Z, Yaw, and Forward speeds (INCREASE FOR BIG VESSELS)
+SpeedAdjust = 1 #Size Adjust
+
+#Size of Nolphin board, measured in PHX units
+#1x1 = 1. 2x2 = 2. 4x2 = 3. 4x4 = 4. 8x2 = 4. 8x8 = 8. 32x16 = 24. 
+Size = 1 
+
+#1 - 60, higher being less of an effect.
+Friction =  4 + (SpeedAdjust * SpeedAdjust) 
+
+#Yaw (turning) Mode:
+#0: Off
+#1: "Friction based", ideal for more realistic turning (if you are spun, the ship stabalizes but does not revert to your desired Yaw)
+#2: "Forced Yaw", ideal for more controlled turning (if you are spun, the ship remembers what Yaw you were at before)
+#Suggested for 2: Spaceships; Large Air Based; Anything with Topspeed > 70kph
+#Suggested for 1: Small air based; ground based
+YawMode = 2
+
+#<< End of Configuration >>#
+
+#NOTES ON INPUTS:
+#WASD/Up/Down: Does not need to be from an APC. Only send values of 1 or 0 for each. 
+#OnOff toggles the internal engine; Force simply sets the engine.
+#TargetZ overrides the height controls and simply hovers at the inputted height.
+
+#THRUSTER ORIENTATIONS:
+#Thrusters's power should be about 1/10th-1/15th the total weight of the contraption.
+#Thrusters's weight should be AT LEAST 1/100th the total weight (not counting other thrusters).
+#Thrusters should be prepared as follows, facing up (Names prefixed by _'s mean on the side of the surface)
+#
+#	_FLSide	North
+#
+#   	West	CHIP	East _Right
+#
+#	       	South
+#	      	_Rear
+#
+
+
+
+
+#XYZ tracking Mode:
+#Wire up your desired location to the inputs of XYZ, and the Nolphin will swiftly fly there.
+GPSMode = (X & Y & TargetZ) #Becomes off if any of these are unwired, on if all
+
+#Declares common variables
+interval(20)
+On = Engines
+Off = !Engines
+CEntityAng = entity():angles()
+CEntityPos= entity():pos()
+Pitch = CEntityAng:pitch()
+Yaw = CEntityAng:yaw()
+Roll = CEntityAng:roll()
+TarR=(($Roll)*8+Roll)
+TarP=(($Pitch)*8+Pitch) + ForLean3
+
+#Power settings
+if(~OnOff & OnOff) {Engines = !Engines}
+if(ForceOff) {Engines = 0} 
+if(ForceOn) {Engines = 1} elseif(~ForceOn & !ForceOn) {Engines = 0}
+
+#Forward Thrust, smoothened
+For3=(W-S)*100
+if(For4 > For3) {if(For4 == 0 | (For4 + For3) >-100) {For4 -= 2.1} else{For4 -= 0.70}}
+if(For3 > For4) {if(For4 == 0 | (For4 + For3) < 100) {For4 += 2.1} else{For4 += 0.70}}
+if(For4 < 1 & For4 > 0) {Forward = 0} else{Forward = For4 / 333}
+
+#Forward Lean, smoothened
+ForLean=(W-S)*100
+if(ForLean2 > ForLean) {if(ForLean2 == 0 | (ForLean2 + ForLean) >-100) {ForLean2 -= 1.2} else{ForLean2 -= 0.50}}
+if(ForLean > ForLean2) {if(ForLean2 == 0 | (ForLean2 + ForLean) < 100) {ForLean2 += 1.2} else{ForLean2 += 0.50}}
+if(ForLean2 < 1 & ForLean2 > 0) {ForLean3 = 0} else{ForLean3 = ForLean2 / 5}
+
+#Additional Z to add, smoothened
+Z3=(Up-Down)* (100 * SpeedAdjust)
+if(Z4 > Z3) {if(Z4 == 0 | (Z4 + Z3) >-100) {Z4 -= 0.84} else{Z4 -= 0.28}}
+if(Z3 > Z4) {if(Z4 == 0 | (Z4 + Z3) < 100) {Z4 += 0.84} else{Z4 += 0.28}}
+if(Z4 < 1 & Z4 > 0) {ZForce = 0} else{ZForce = Z4 / 5}
+AddedZ += ZForce
+
+#Z Control
+if(InternalZ == 0) {InternalZ = CEntityPos:z() + 35}
+if(TargetZ != 0) {
+DiffZ = TargetZ - CEntityPos:z()
+ZThrust = -(DiffZ + $DiffZ * 15)  
+} else {
+DiffZ = InternalZ - CEntityPos:z() + AddedZ
+ZThrust = -(DiffZ + $DiffZ * 5)}
+
+#Angle/Height thrusters
+North = ZThrust + (TarP * 2)
+East = ZThrust + (TarR * 2)
+South = ZThrust - (TarP * 2)
+West = ZThrust - (TarR * 2)
+
+#XY OR Friction, Rear/Right Maneouverability Thrusters
+if(GPSMode == 0) { #Friction mode
+Rear = 40 * Forward * SpeedAdjust + ((!W & !S) * entity():velL():x() / Friction)
+Right = (entity():velL():y() / Friction) }
+elseif(GPSMode == 1) { #XY tracking Mode
+SubtractedV = vec(X - entity():pos():x(), Y - entity():pos():y(), TargetZ - entity():pos():z())
+LocalX = SubtractedV:dot(entity():forward())
+LocalY = SubtractedV:dot(entity():right())
+Rear =  (  (-($LocalX*4 + LocalX) / 7.5) + (entity():velL():x() / Friction)) / 2
+Right = (  (($LocalY*4 + LocalY) / 7.5) + (entity():velL():y() /Friction)) / 2  
+}
+
+#Yaw, FLSide thruster
+if(YawMode == 1) { #Friction based
+FLSide = (D - A) * (1 + For4 / 60) + ((!A & !D) * entity():angVel():yaw() / Friction) }
+elseif(YawMode == 2) { #Forced Yaw based
+if(~Engines & Engines) {YForce = -Yaw}
+YForce += (D - A) * 1.4 * (SpeedAdjust / 2 + 0.5)
+if(YForce < -179) {YForce = 179}
+if(YForce > 179) {YForce = -179}
+YAdjust = angnorm(Yaw + YForce)
+FLSide = (($YAdjust) * 8 + YAdjust) *2 *SpeedAdjust}
+else{FLSide = (D - A) * SpeedAdjust} #Default to basic
+
+#Turns it off + resets
+if(ForceOff | !Engines) {YForce = 0, AddedZ = 0, InternalZ=CEntityPos:z()+35, Z4 = 0, North = 0, East = 0, South = 0, West = 0, Rear = 0, Right = 0, FLSide = 0}
+
+
+#Internal Thrusters
+#Weight = 1.1
+#Weight = Weight / 6
+if(Board:weight() > 45000) {BWeight = 100} else{BWeight = Board:weight()}
+Weight = Adjust * BWeight
+#Adjust was approximately 0.05->0.5 in ideal cases
+#Radius didn't seem to have any change when it was over 1000, settled on 5k
+#Weight was 50 in tests
+
+if(Engines) {
+Board:applyOffsetForce2(vec(0,0,-ZThrust) * Weight, vec(Radius,0,0))
+Board:applyOffsetForce2(vec(0,0,-ZThrust) * Weight, vec(-Radius,0,0))
+Board:applyOffsetForce2(vec(0,0,-ZThrust) * Weight, vec(0,Radius,0))
+Board:applyOffsetForce2(vec(0,0,-ZThrust) * Weight, vec(0,-Radius,0))
+}

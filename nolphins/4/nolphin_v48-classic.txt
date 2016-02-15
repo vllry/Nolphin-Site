@@ -1,0 +1,304 @@
+@name Nolphin V4.8-classic Engine
+@inputs Prop:entity NWire:wirelink Destination:vector
+@inputs W A S D Up Down OnOff EnginesIn X Y Z TargetP TargetR Chair:entity 
+@outputs ID Engines Speed
+@outputs FrontLeftThrust PitchThrust RollThrust RearThrust RightThrust UpThrust
+@persist Roll Yaw Pitch Engines PropB:entity ChairB:entity
+@persist ZThrust ZDiff InternalZ ZThrottle ZAdded RThrottle YThrottle Throttle TopSpeed2
+@persist YForce YAdjust LocalX LocalY FreeV:vector TotalMass
+@persist Ownerpos:vector NautomatonPause Tick Owner:entity Instructions:array PList:array
+@persist Time Timer
+@persist YawMode TurnSpeed Friction AngFriction TopSpeed RAcceleration ZTopSpeed ZAcceleration TurnAccel
+@persist XYZDistance Nautomaton ZOffset RollLeaning PitchLeaning RollRevertSpd SmartZ Freecam ZGravity ZG2 Version:string
+@persist AlwaysOn AutoDetect RagdollMode Jukebox AutoChair RadiusModifier Orientation FreeSpeed FullContraption InternalCombustion RequireLS
+#About the Classic release:
+#The current Nolphin chip is tightly infused with lua functions unavaliable on most servers, and hence has far
+#more functionality than that which is shown here. This is a simplified bare bones engine that should work on any
+#wire-svn server. 
+#Originally made by Nebual, of Nebtown. 24.68.133.128:27000, or nebtown.pbworks.com
+#Hi mom!
+if(first()) {       #Nebcorp Oscillating Levitations Processor and Highly Intellegent Nolphin
+                    Version = "4.8-classic" #Jan 18th, 2010##
+                    ###<<< Configuration >>>###
+                    
+#Settingname = Value #Range [Default Value], Description.
+
+#Yawmode (HOW DO TURN):
+#1: "Fixed-Speed": Turn speed is based on forward thrust; scales well on most ships, feels most 'natural'. Recommended.
+#2: "Forced-Yaw" : Ship cannot be spun due to external forces, as it always faces the last  
+YawMode = 1      # direction set. Better for huge ships, or for increased stability.
+    TurnSpeed = 1   #0.2 - 4 [1], for personal preference.
+	TurnAccel = 1   #0.2 - 4 [1]
+Friction    = 1     #0   - 5 [1], higher increases friction. Controls how quickly the ship comes to a stop.
+    AngFriction = 1 #0   - 5 [1], lower reduces angular power. Basically, how powerful the stabalizers are. (Lower/disable in ground-based vehicles like cars) [Default 1]
+RadiusModifier = 1  #0.2 - 2 [1], higher values increase stability, but too high causes crazy shaking.
+ZGravity     = 0    #-10 - 8 [0], 0: Hovercraft (default),  Anything else: Z is off, Nolphin fakes low-medium gravity (Cars? Hang-gliders?)
+Orientation = 1     #Alters which direction is "forward". 1:normal, -1:reversed, 2:facing right, -2:facing left
+
+#TopSpeed
+#1 - 180,    holding W increases the current speed, over 2 seconds, to TopSpeed (measured in KM/H).                  More like racing games.
+#0,          tapping W increases the current speed, by 2km/h per tap, and the Nolphin 'autopilots' at this speed.    More like Autopilot.
+#-1 - -180,  pressing W applies bursts of speed, speed will very gradually decrease otherwise.                       More like a real car.
+TopSpeed  =  40, RAcceleration = 1  # ^^^ [60] [1], Acceleration affects how quickly you reach top speed. Higher is sooner.
+ZTopSpeed =  40, ZAcceleration = 1  #1 - 60 [40] [1], Vertical top speed, measured in KM/H, and the vertical acceleration multiplier.
+
+XYZDistance = 140 #[140] Distance away from XYZ targets to stop at, in Garries.
+Nautomaton  = 0   #[0]   Makes the Nolphin follow you around like a pet :D
+    ZOffset = 40  #[40]  How high off the ground should the Nautomaton be.
+
+RollLeaning  = 1  #0 - 1.75 [1], left/right leaning,  while turning. Value indicates how far (45*Val) to lean.
+PitchLeaning = 1  #0 - 1.75 [1], forward/back leaning, while rising. Value indicates how far (45*Val) to lean.
+RollRevertSpd= 3  #1 - 5    [3], how quickly the ship recovers from intentional (turning/banking) rolls. 
+SmartZ       = 25 #[25] Values >0 resets targetZ if Nolphin is beyond that distance. 0 is hoverball behavior, snapping back to set Z.  
+Freecam      = 1  #[1] Causes pressing Shift to enter Freecam mode, where the Nolphin flies towards your view.
+   FreeSpeed = 15 #5 - 50 [15], how fast to move in FreeSpeed.
+ 
+#Modes
+AlwaysOn    = 0 #[0] Forces Nolphin on constantly (for debuggin, utility)
+AutoDetect  = 1 #[1] Uses whatever entity the chip is sitting on by default, as the base.
+RagdollMode = 0 #[0] KEEP OFF LOL
+Jukebox     = 1 #[1] Enables Music (press Shift-Alt)
+AutoChair   = 1 #[1] Automatically creates a chair, if none is found. 2 for Microchair
+RequireLS   = 0 #[0] Nolphin won't run without SB3 energy; uses SB3 Energy
+
+InternalCombustion = 1 #[1] Leave 0 if you want to wire up your own thrusters
+FullContraption    = 0 #[0] Utilizes patented Array magickz to absorb power from every atom of your ship. ;3
+Haxboard           = 0 #[0] lolololololol
+
+    ###<< End of Configuration >>
+    
+    
+    
+ 
+#Prop:entity is wired to a source of entitydata about your ship, such as an Entity Marker
+#To use XYZ-tracking mode, wire up your desired location to the XYZ inputs, and the Nolphin will swiftly fly there.
+ 
+
+#if(first()) Stuff
+timer("Rediscover Engines", 50) #Find props
+TopSpeed = clamp(TopSpeed, -180, 180) #Shit goes bad at speeds over 180km/h; source limitation
+}
+ 
+#Duping fix: Resets chip a short period after being duped, to fully initialize
+if(duped()) {runOnTick(0), interval(0), Engines = 666, exit()}
+if(Engines == 666) {reset()}
+
+#Finds Engine Entities, also other 'periodic' events
+if(clk("Rediscover Engines") & AutoDetect) {
+    timer("Rediscover Engines", 4000)
+    
+    if(Prop) {PropB = Prop} else{PropB = entity():isWeldedTo()}
+    
+    PList = entity():getConstraints()
+    TotalMass = 0
+    for(K=1, PList:count()) {TotalMass += PList[K, entity]:mass()}
+    
+	   #Find us a driver's seat
+    findIncludeClass("prop_vehicle_prisoner_pod")
+    Find = findInSphere(PropB:toWorld(vec(0,0,25)), 150)
+    if(Find) {ChairB = findClosest(entity():pos())}
+}
+if(!Prop) {Prop = PropB}
+if(!Chair) {Chair = ChairB}
+ID = Prop:id(), Time = curtime(), Timer += $Time
+if(Destination) {X = Destination:x(), Y = Destination:y(), Z = Destination:z()}
+
+if(abs(Orientation) == 2) {PRight = Prop:forward(), PForward = Prop:right(), Speed = toUnit("km/h", Prop:velL():x())}
+else                      {PRight = Prop:right(), PForward =-Prop:forward(), Speed = toUnit("km/h",-Prop:velL():y())}
+PRight *= sign(Orientation), PForward *= sign(Orientation), Speed *= sign(Orientation)
+
+#Establishes Communications
+if(NWire) {W = NWire:number("W"), A = NWire:number("A"), S = NWire:number("S"), D = NWire:number("D"), Shift = NWire:number("Shift"), Mouse1 = NWire:number("Mouse1")
+Up = NWire:number("Space"), Down = NWire:number("R"), if(changed(NWire:number("Mouse2")) & NWire:number("Mouse2")) {Engines = !Engines}}
+
+Driver = Chair:driver()
+if(Driver:inVehicle()) {
+    #Instructions System
+    if(changed(Driver)) {
+        for(K=0, Instructions:count()) {if(Instructions[K, entity] == Driver) {IsPrevDriver = 1}}
+        if(!IsPrevDriver) {
+            Instructions:pushEntity(Driver)
+            White = vec(200,200,200), Purple = vec(120,100,200)
+            Chair:printColorDriver(White, "    [Welcome to Nolphin version " + Version + "!]")
+            Chair:printColorDriver(Purple, "Power", White, ": Mouse2            ", Purple, "Up", White, ": Space                   ", Purple, "Down", White, ": R")
+            Chair:printColorDriver(Purple, "Turbo", White, ": Mouse1             ", Purple, "Emergency Fly", White, ": Shift  ", Purple, "Radio", White, ": Alt-Shift")
+            Chair:printColorDriver(Purple, "Ghosting", White, ": Alt-Mouse1  ", Purple, "Freezing", White, ": Alt-Mouse2")
+            Chair:printColorDriver(White, "[To adjust configs midflight: say (config) (value) ie. 'topspeed 60']")
+        }
+    }
+    #Active Configuration (voice commands)
+    if(changed(lastSaid()) & lastSpoke() == Driver) {
+        Said = Driver:lastSaid():explode(" "), Said1 = Said:string(1):lower(), Said2 = Said:string(2):toNumber()
+        if(Said:count() == 2) {
+            if    (Said1:find("gravity"))     {ZGravity      = clamp(Said2,-25, 20),  Chair:hintDriver("ZGravity changed to " +  ZGravity, 3)}
+            elseif(Said1 == "yawmode")        {YawMode       = clamp(Said2, 1, 2),    Chair:hintDriver("YawMode changed to " +   YawMode, 3), YForce = -Prop:angles():yaw()}
+            elseif(Said1 == "turnspeed")      {TurnSpeed     = clamp(Said2, 0, 5),    Chair:hintDriver("TurnSpeed changed to " + TurnSpeed, 3)}
+            elseif(Said1 == "topspeed")       {TopSpeed      = clamp(Said2,-180,180), Chair:hintDriver("TopSpeed changed to " +  TopSpeed, 3), TopSpeed2=0}
+            elseif(Said1 == "ztopspeed")      {ZTopSpeed     = clamp(Said2, 0, 180),  Chair:hintDriver("ZTopSpeed changed to " + ZTopSpeed, 3)}
+            elseif(Said1 == "friction")       {Friction      = clamp(Said2, 0, 10),   Chair:hintDriver("Friction changed to " +  Friction, 3)}
+            elseif(Said1 == "angfriction")    {AngFriction   = clamp(Said2, 0, 10),   Chair:hintDriver("AngFriction changed to " + AngFriction, 3)}
+            elseif(Said1 == "leaning")        {RollLeaning   = clamp(Said2, 0, 1.75), Chair:hintDriver("Pitch & Roll leaning changed to " + RollLeaning, 3), PitchLeaning = clamp(Said2, 0, 1.75)}
+            elseif(Said1 == "rollleaning")    {RollLeaning   = clamp(Said2, 0, 1.75), Chair:hintDriver("RollLeaning changed to " +   RollLeaning, 3)}
+            elseif(Said1 == "pitchleaning")   {PitchLeaning  = clamp(Said2, 0, 1.75), Chair:hintDriver("PitchLeaning changed to " +  PitchLeaning, 3)}
+            elseif(Said1:find("radius"))      {RadiusModifier= clamp(Said2, 0.05, 3), Chair:hintDriver("RadiusModifier changed to "+ RadiusModifier, 3)}
+            elseif(Said1:find("orient"))      {Orientation   = clamp(Said2,-2, 2),    Chair:hintDriver("Orientation changed to " +   Orientation, 3)}
+            elseif(Said1:find("free"))        {FreeSpeed     = clamp(Said2, 1, 180),  Chair:hintDriver("FreeSpeed changed to " +     FreeSpeed, 3)}
+            elseif(Said1:find("acceleration")){RAcceleration = clamp(Said2, 0.1, 4),  Chair:hintDriver("RAcceleration changed to " + RAcceleration, 3)}
+        }
+    }
+}
+else{Driver = noentity()}
+
+#Power settings
+if(inputClk()) {
+    if(~OnOff & OnOff) {Engines = !Engines}
+    if(~EnginesIn) {Engines = EnginesIn}
+}
+Engines = Engines | AlwaysOn | EnginesIn
+if(Engines | Driver) {runOnTick(1)} else{interval(500), runOnTick(0)}
+
+
+
+#Main calculations power switch; nearly everything below this line is contained within this if() {
+if(tickClk() & Engines) {
+
+#Freecam Mode
+if(Shift & Freecam)   {
+    Eye = Driver:eye()
+    if(!FreeV) {FreeV = Prop:pos()}
+    FreeV += Eye*FreeSpeed*sign(W-S)
+    X = FreeV:x(), Y = FreeV:y(), Z = FreeV:z()} 
+else{FreeV = vec()}
+
+#Additional Z
+ZThrottle += 0.007 * ZAcceleration * sign(Up-Down -ZThrottle/10) * (inrange(ZThrottle, -1, 1) + 3*(sign(Up-Down) != sign(ZThrottle) & abs(ZThrottle) > 0.021))
+ZAdded += ZThrottle * fromUnit("km/h", ZTopSpeed) / 33
+
+#Pitch and Roll Calculations
+RThrottle += 0.007 * sign(D-A - RThrottle/10) * (inrange(RThrottle, -1, 1) + RollRevertSpd*(sign(D-A) != sign(RThrottle) & abs(RThrottle) > 0.021))
+
+Pitch = Prop:angles():pitch(), Roll = Prop:angles():roll()
+TarP = (Pitch + $Pitch*8)*AngFriction + ( ZThrottle*PitchLeaning*(abs(Orientation)==2) + RThrottle*RollLeaning *(abs(Orientation)==1))*sign(Orientation)*45
+TarR = (Roll  + $Roll *8)*AngFriction + (-RThrottle*RollLeaning *(abs(Orientation)==2) + ZThrottle*PitchLeaning*(abs(Orientation)==1))*sign(Orientation)*45
+
+
+#Nautomaton overrides normal XYZ inputs
+if(Nautomaton) {
+    Yawmode = 1, SmartZ = 12, XYZDistance = max(XYZDistance, 125), Engines = 1
+    if(Prop:pos():distance(Owner:pos()) > XYZDistance) {Ownerpos = Owner:pos() + vec(0, 0, ZOffset), NautomatonPause = 0}
+    elseif(!NautomatonPause) {Ownerpos = vec(Prop:pos():x(), Prop:pos():y(), Owner:pos():z() + ZOffset), NautomatonPause = 1}
+    X = Ownerpos:x(), Y = Ownerpos:y(), Z = Ownerpos:z()
+}
+
+#SHARED THRUST:
+YFriction =  Prop:velL():y() / 10 * Friction
+XFriction = -Prop:velL():x() / 10 * Friction
+
+#Friction Mode
+if(!Z) { 
+    #Pseudo-Friction
+    if(abs(Orientation) == 2) {XSlow = XFriction * (sign(XFriction) != (W-S)* sign(Orientation)), YSlow = YFriction}
+    else                      {YSlow = YFriction * (sign(YFriction) != (W-S)*-sign(Orientation)), XSlow = XFriction}
+    
+    #Forward Thrust
+    if(TopSpeed > 0) {        "Practical"
+        Throttle += 0.007 * RAcceleration * sign(W-S -Throttle/10) * (inrange(Throttle, -1, 1) + 3*(sign(W-S) != sign(Throttle) & abs(Throttle) > 0.021))
+        Forward = (Speed - (clamp(TopSpeed * (1 + Mouse1), 0, 180) *Throttle))* (W | S) }
+    elseif(TopSpeed < 0) { #  "Realistic"
+        if(abs(Orientation) == 2) {XSlow = 0} else{YSlow = 0}
+        if(changed(W-S)) {Throttle = Speed / -TopSpeed}
+        Throttle += 0.007 * RAcceleration * sign(W-S - Throttle/10) * (inrange(Throttle, -1, 1) + 2*(sign(W-S) != sign(Throttle) & abs(Throttle) > 0.021))
+        Forward = (Speed - (clamp(-TopSpeed * (1 + Mouse1), 0, 180) *Throttle))*(W|S)}
+    else{#TopSpeed == 0,      "Autopilot"
+        if(changed(Engines + 1) & Engines) {TopSpeed2 = round(Speed*2)/2}
+        if(abs(TopSpeed2) < 10) {TopMul = 1} elseif(abs(TopSpeed2) < 50) {TopMul = 2} else{TopMul = 4}, TopMul *= RAcceleration
+        if(changed(W) & W & TopSpeed2<180) {TopSpeed2 += TopMul}
+        if(changed(S) & S & TopSpeed2>-180) {TopSpeed2 -= TopMul}
+        Forward = Speed - TopSpeed2
+        if(changed(TopSpeed2)) {Chair:hintDriver("Current Engine Speed: " + TopSpeed2, 2)}
+    }
+    #Orientation Patch
+    FForward = -sign(Orientation)*Forward*(abs(Orientation)==2)
+    RForward = -sign(Orientation)*Forward*(abs(Orientation)==1)
+   
+    #Z Handling
+    #if(ZGravity) {ZThrust = 6 - ZGravity}
+    if(ZGravity) {ZThrust = (TotalMass / Prop:mass()) * (600 * $Time) * ZGravity/10   }#+ (Prop:velL():z()*Friction/5) } <--- Might help
+    else{
+        if(!InternalZ) {InternalZ = Prop:pos():z() + 35}
+        if(SmartZ & !inrange(ZDiff, -SmartZ, SmartZ)) {ZAdded -= ZDiff - sign(ZDiff)*SmartZ}
+        ZDiff = InternalZ - Prop:pos():z() + ZAdded
+        ZThrust = ZDiff*2 + $ZDiff * 10
+    }
+}
+
+#XYZ tracking Mode
+elseif(Z) {
+    PosZ = Prop:pos():z()
+    if(changed(inrange(ZAdded, PosZ - 1000, PosZ + 1000))) {ZAdded = PosZ}
+    if(Prop:pos():distance(vec(X,Y,Z)) > XYZDistance) {
+        SubtractedV = clamp(vec(X - Prop:pos():x(), Y - Prop:pos():y(), Z - PosZ), -TopSpeed, TopSpeed)
+        LocalX = SubtractedV:dot(Prop:forward())
+        LocalY = SubtractedV:dot(Prop:right())
+        if(abs(Z - Prop:pos():z()) > SmartZ) {ZAdded += sign(Z - PosZ) * TopSpeed/6} #7.5 more precise, 6 more practical
+        XSlow = LocalX + $LocalX*10 + XFriction
+        YSlow = LocalY + $LocalY*10 + YFriction        
+        
+    } else{XSlow = XFriction, YSlow = YFriction}
+    ZDiff = -PosZ + ZAdded
+    ZThrust = ZDiff*2 + $ZDiff * 10
+    YawMode = 4
+}
+
+#Yaw
+if(YawMode == 1) { #Fixed-Speed based
+    YThrottle += 0.007 * TurnAccel * sign(A-D -YThrottle/10) * (inrange(YThrottle, -1, 1) + 3*(sign(A-D) != sign(YThrottle) & abs(YThrottle) > 0.021))
+    if(YThrottle) {TarY = Prop:angVel():yaw() - ( YThrottle*15*TurnSpeed * (1 + (abs(Speed) / max(abs(TopSpeed), TopSpeed2)))) }
+    else{TarY = (!A & !D) * Prop:angVel():yaw() * AngFriction }}
+elseif(YawMode == 2) { #Forced Yaw based
+    if(changed(Engines + 5)) {YForce = -Prop:angles():yaw()} #If we just turned on
+    YForce += (D - A) * TurnSpeed
+    YAdjust = angnorm(Prop:angles():yaw() + angnorm(YForce+180)-180)
+    TarY = ($YAdjust * 10 + YAdjust) *TurnSpeed}
+elseif(YawMode == 3) { #For Nautomaton Use
+    YAdjust = angnorm(Prop:bearing(Ownerpos) + 5)
+    TarY = ($YAdjust * 10 + YAdjust)}
+elseif(YawMode == 4) { #For XYZ use
+    if(Prop:pos():distance(Destination) > XYZDistance) {
+        YAdjust = angnorm(Prop:angles():yaw() - (Prop:pos() - Destination):toAngle():yaw())
+        TarY = clamp(($YAdjust * 10 + YAdjust) *TurnSpeed, -30, 30) + Prop:angVel():yaw()/(5*TurnSpeed)
+    } else{TarY = Prop:angVel():yaw() * AngFriction}}
+else{TarY = (D - A) * TurnSpeed} #Default to basic
+
+if(InternalCombustion) {
+    #Internal Thrusters
+    Weight = Prop:mass()
+    Radius = Prop:radius() * RadiusModifier
+    CMass = Prop:massCenterL()
+    Inertia = Prop:inertia() / 5 /AngFriction
+    if(Prop:isVehicle()) {TarY = -TarY, QVar = XSlow, XSlow = YSlow, YSlow = -QVar, QVar = FForward, FForward = -RForward, RForward = QVar}
+    if(Prop:type() == "prop_ragdoll") {Radius = 100, Weight = 100}
+    
+    Prop:applyForce(vec(0,0,ZThrust*Weight)) #Primary Z
+    Prop:applyForce(Prop:forward() * (XSlow + FForward*16) * Weight/2) #X Friction + Forward/Back
+    Prop:applyForce(Prop:right()  *  (YSlow + RForward*16) * Weight/2)  #Y Friction + Forward/Back
+    
+    Prop:applyOffsetForce( TarR *Prop:up() *Inertia:x(), Prop:toWorld(vec(0,-Radius,0)) + CMass)
+    Prop:applyOffsetForce(-TarR *Prop:up() *Inertia:x(), Prop:toWorld(vec(0, Radius,0)) + CMass)
+    Prop:applyOffsetForce( TarP *Prop:up() *Inertia:y(), Prop:toWorld(vec( Radius,0,0)) + CMass)
+    Prop:applyOffsetForce(-TarP *Prop:up() *Inertia:y(), Prop:toWorld(vec(-Radius,0,0)) + CMass)
+    Prop:applyOffsetForce( TarY *Prop:right() *Inertia:z()/2, Prop:toWorld(vec( Radius,-Radius,0)) + CMass)
+    Prop:applyOffsetForce(-TarY *Prop:right() *Inertia:z()/2, Prop:toWorld(vec(-Radius, Radius,0)) + CMass)
+}#External Thrusters
+else{
+    RearThrust = -XSlow + FForward*16
+    RightThrust = YSlow + RForward*16
+    FrontLeftThrust = TarY
+    PitchThrust = TarP
+    RollThrust = TarR
+    UpThrust = ZThrust
+}
+}#Closes if(Engines) power switch
+
+#Resets Variables when off
+if(changed(Engines + 4) & !Engines) {ZAdded =0, InternalZ =0, YAdjust =0, Forward =0, Throttle =0, ZThrottle =0, RThrottle =0, TopSpeed2 =0}

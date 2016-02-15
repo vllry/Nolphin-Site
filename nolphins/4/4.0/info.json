@@ -1,0 +1,4 @@
+{
+	"description" : "Original attempts at a pure-E2 Nolphin. These early models had a tendency to shoot momentarily to the top of the map upon load, a bug/feature that remains, albeit in more neutered forms, throughout most of the v4 line.",
+	"main" : true
+}

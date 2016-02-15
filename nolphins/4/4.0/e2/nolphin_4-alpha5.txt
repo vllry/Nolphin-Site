@@ -1,0 +1,195 @@
+@name Nicole
+@inputs W A S D Up Down OnOff ForceOff ForceOn X Y Z Board:entity
+@outputs Pitch Roll Radius RightNM:vector Mow:vector
+@persist Roll Yaw Pitch P2 R2 Engines ForceOn
+@persist ZThrust DiffZ InternalZ ZForce AddedZ Z2 For2
+@persist YForce YAdjust LocalX LocalY
+#Nebcorp automatic self-righting, hovering, gyrations and maneuverabilities calculation and excecution chip 
+##Version 4.0##
+#Most recent time I adjusted the date: 
+##Feb 4th, 11:30##
+ 
+
+###<< Configuration >>#
+RollLeaning = 1  #0 off, 1 on
+PitchLeaning = 1  #0 off, 1 on
+ 
+RSpeed = 1  #0.2 - 6, The primary speed control for forward/back motions. Default 1
+TSpeed = 1  #0.2 - 4, The turning speed control. Default 1
+ZAcceleration = 1  #0.2 - 4, The speed of acceleration of going up/down. Default 1
+ZTopSpeed = 1  #0.2 - 3, The top speed going up/down. Default 1
+ 
+Friction = 5  #1 - 60, higher being less of an effect. Controls how quickly the ship stops.
+RadiusModifier = 2 #0.5 - 2. If stability is compromised OR for thin ships, lower.
+
+#Yaw (turning) Mode:
+#1: "Friction based", ideal for more realistic turning (if you are spun, the ship stabalizes but does not revert to your desired Yaw)
+#2: "Forced Yaw", ideal for more controlled turning (if you are spun, the ship remembers what Yaw you were at before)
+#Suggested for 2: Spaceships; Large Air Based; Anything with Topspeed > 70kph
+#Suggested for 1: Small air based; ground based
+YawMode = 2
+ 
+#Things you probably should never ever modify upon pain of death
+RagdollMode = 0 #KEEP OFF
+###<< End of Configuration >>#
+ 
+
+#NOTES ON INPUTS:
+#WASD/Up/Down: Does not need to be from an APC. Only send values of 1 or 0 for each. 
+#OnOff toggles the internal engine; Force simply sets the engine.
+#Z overrides the height controls and simply hovers at the inputted height.
+ 
+#THRUSTER ORIENTATIONS:
+#Thrusters's power should be about 1/10th-1/15th the total weight of the contraption.
+#Thrusters's weight should be AT LEAST 1/100th the total weight (not counting other thrusters).
+#Thrusters should be prepared as follows, facing up (Names prefixed by _'s mean on the side of the surface)
+#
+#_FLSideNorth
+#
+#   WestCHIPEast _Right
+#
+#       South
+#      _Rear
+#
+ 
+  
+ 
+ 
+#To use XYZ tracking Mode:
+#Wire up your desired location to the inputs of XYZ, and the Nolphin will swiftly fly there.
+GPSMode = (X & Y & Z) #Becomes off if any of these are unwired, on if all
+ 
+#Declares common variables
+interval(20)
+On = Engines
+Off = !Engines
+Pitch = Board:angles():pitch()# * (1 + Board:forward():z()) / 2
+Yaw = Board:angles():yaw()
+Roll = Board:angles():roll()# * (1 + Board:right():z()) / 2
+TarR=(($Roll)*8+Roll) + (R2 *0.45 *PitchLeaning)
+TarP=(($Pitch)*8+Pitch) - (P2 *PitchLeaning)
+ 
+#Power settings
+if(~OnOff & OnOff) {Engines = !Engines}
+if(ForceOff) {Engines = 0} 
+if(ForceOn) {Engines = 1} elseif(~ForceOn & !ForceOn) {Engines = 0}
+
+#Forward Thrust, smoothened
+For1=(W-S)*100
+if(For2 > For1) {if(For1 == 0 | (For1 == -100 & (For2 > 0))) {For2 -= 2.1} else{For2 -= 0.70}}
+if(For1 > For2) {if(For1 == 0 | (For1 == 100 & (For2 < 0))) {For2 += 2.1} else{For2 += 0.70}}
+if(For2 < 1 & For2 > 0) {Forward = 0} else{Forward = For2 / 333}
+
+#Additional Z to add, smoothened
+Z3 = ZTopSpeed * 100
+Z1=(Up-Down)* Z3
+if(Z2 > Z1) {if(Z1 == 0 | (Z1 == -Z3 & (Z2 > 0))) {Z2 -= 0.84 * ZAcceleration} else{Z2 -= 0.28 * ZAcceleration}}
+if(Z1 > Z2) {if(Z1 == 0 | (Z1 == Z3 & (Z2 < 0))) {Z2 += 0.84 * ZAcceleration} else{Z2 += 0.28 * ZAcceleration}}
+if(Z2 < 1 & Z2 > 0) {ZForce = 0} else{ZForce = Z2 / 5}
+AddedZ += ZForce
+
+#Additional Pitch, smoothened
+if(ZForce > 15) {P2 = 45} elseif(ZForce < -15) {P2 = -45} else{P2 = ZForce * 3}
+
+#Additional Roll, smoothened
+R1 = (D - A) * 100
+if((R2 < R1) & (R2 > R1 + 1)) {R2 = 0} 
+elseif(R2 > R1) {if(R1==0 | (R1 == -100 & (R2 > 0))) {R2 -= 0.9} else{R2 -= 0.3}} 
+elseif(R1 > R2) {if(R1==0 | (R1 == 100 & (R2 < 0))) {R2 += 0.9} else{R2 += 0.3}}
+
+#Z Control
+if(InternalZ == 0) {InternalZ = Board:pos():z() + 35}
+if(Z != 0) { #If we're recieving a target Z to go to, go.
+DiffZ = Z - Board:pos():z()
+ZThrust = -(DiffZ + $DiffZ * 15)  
+} else { #Otherwise, default to current position.
+DiffZ = InternalZ - Board:pos():z() + AddedZ
+if(DiffZ > 28) {AddedZ -= (DiffZ - 28)} #Resets if we're waaay below target.
+elseif(DiffZ < -28) {AddedZ -= (DiffZ + 28)} #Resets if we're waaay above target.
+ZThrust = -(DiffZ + $DiffZ * 5)}
+
+###Allows Z to work regardless of orientation
+#UpNZThrust = ZThrust * (1 - entity():forward():z())
+#UpSZThrust = ZThrust * (1 + entity():forward():z())
+#UpEZThrust = ZThrust * (1 - entity():right():z())
+#UpWZThrust = ZThrust * (1 + entity():right():z())
+#if(entity():forward():z() < 0.03) {RearZThrust = -25 *3 * -entity():forward():z()} else{RearZThrust = 0}
+#RightZThrust = R2 *3.7 * -entity():right():z()
+#if(RightZThrust > 20) {RightZThrust2 = 20} elseif(RightZThrust < -20) {RightZThrust2 = -20} else{RightZThrust2 = RightZThrust}
+
+###Angle/Height thrusters
+#North = UpNZThrust + (TarP * 2)
+#East = UpEZThrust + (TarR * 2)
+#South = UpSZThrust - (TarP * 2)
+#West = UpWZThrust - (TarR * 2)
+
+#XY OR Friction, Rear/Right Maneouverability Thrusters
+if(GPSMode == 0) { #Friction mode
+XFriction = Board:velL():x() / Friction
+if(XFriction < 0 & !W) {XSlow = XFriction} elseif(XFriction > 0 & !S) {XSlow = XFriction} else{XSlow = 0} 
+Rear = 40 * Forward * RSpeed + XSlow #- RearZThrust
+Right = (Board:velL():y() / Friction)# + RightZThrust2  
+}
+elseif(GPSMode == 1) { #XY tracking Mode
+SubtractedV = vec(X - Board:pos():x(), Y - Board:pos():y(), Z - Board:pos():z())
+LocalX = SubtractedV:dot(Board:forward())
+LocalY = SubtractedV:dot(Board:right())
+Rear =  (  (-($LocalX*4 + LocalX) / 7.5) + (Board:velL():x() / Friction)  ) / 2
+Right = (  (($LocalY*4 + LocalY) / 7.5) + (Board:velL():y() /Friction)  ) /2  
+}
+
+#Yaw, FLSide thruster
+if(YawMode == 1) { #Friction based
+FLSide = (D - A) * (1 + For2 / 60) + ((!A & !D) * Board:angVel():yaw() / Friction) }
+elseif(YawMode == 2) { #Forced Yaw based
+if(!Engines) {YForce = -Yaw}
+YForce += (D - A) * 1.4 * TSpeed
+if(YForce < -179) {YForce = 179}
+if(YForce > 179) {YForce = -179}
+YAdjust = angnorm(Yaw + YForce)
+FLSide = (($YAdjust) * 10 + YAdjust) *1.5 *TSpeed}
+else{FLSide = (D - A) * TSpeed} #Default to basic
+
+#Turns it off + resets
+if(!Engines) {AddedZ = 0, InternalZ = Board:pos():z()+35, Z2 = 0, For2 = 0
+North = 0, East = 0, South = 0, West = 0, Rear = 0, Right = 0, FLSide = 0, ZThrust = 0}
+
+
+#Internal Thrusters
+#Weight = 1.1
+#Weight = Weight / 6
+#if(Board:weight() > 45000) {BWeight = 100} else{BWeight = Board:weight()}
+#Weight = Adjust * BWeight
+#Adjust was approximately 0.05->0.5 in ideal cases
+#Radius didn't seem to have any change when it was over 1000, settled on 5k
+#Weight was 50 in tests
+#Weight = 25
+Weight = Board:mass() * 0.8
+#PHXSize = 12
+#Radius = PHXSize * 47
+Radius = Board:radius() * RadiusModifier
+
+if(RagdollMode) {Radius = 120, Weight = 100}
+Mow = Board:forward()
+RightNM = Board:right()
+
+if(Engines) {
+#Board = entity()
+#Board:applyOffsetForce(vec(0,0,-ZThrust) * Weight, Board:toWorld(vec(Radius,0,0)))
+#Board:applyOffsetForce(vec(0,0,-ZThrust) * Weight, Board:toWorld(vec(-Radius,0,0)))
+#Board:applyOffsetForce(vec(0,0,-ZThrust) * Weight, Board:toWorld(vec(0,Radius,0)))
+#Board:applyOffsetForce(vec(0,0,-ZThrust) * Weight, Board:toWorld(vec(0,-Radius,0)))
+Board:applyForce(vec(0,0,-ZThrust) * Weight * 4) #Primary Z
+#Board:applyForce(-Board:forward():z() * vec(0,0,-ZThrust) * Weight * 4) #Primary Z
+#Board:applyOffsetForce(vec(0,0,-ZThrust) * Weight * 4, Board:pos() - vec(0,0,500)) #Primary Z
+
+Board:applyOffsetForce(vec(0,0,TarP) * Weight / 2, Board:toWorld(vec(Radius,0,0)) * Board:up():z()) #North
+Board:applyOffsetForce(vec(0,0,-TarP) * Weight / 2, Board:toWorld(vec(-Radius,0,0))* Board:up():z()) #South
+Board:applyOffsetForce(vec(0,0,TarR) * Weight / 2, Board:toWorld(vec(0,-Radius,0))* Board:up():z()) #West
+Board:applyOffsetForce(vec(0,0,-TarR) * Weight / 2, Board:toWorld(vec(0,Radius,0))* Board:up():z()) #East
+
+Board:applyForce(Board:forward() * -Rear * Weight /2)
+Board:applyForce(Board:right() * Right * Weight /2)
+
+Board:applyOffsetForce(Board:right() * vec(FLSide,FLSide,0) * Weight / 4, Board:toWorld(vec(Radius, -Radius, 0)))
+}

@@ -1,0 +1,19 @@
+#Roll & Pitch
+if(RollSpeed==6) {
+    MaxR = 20
+    if(round(RThrottle/2) == 0) {PThrottle = 0}
+    if(Up | Down) {RThrottle += (Up - Down) + (Up - Down)* (abs(RThrottle)*1.1)} else{RThrottle -= sign(RThrottle) + sign(RThrottle) * RThrottle*1.1}
+    #if(Up & sign(RThrottle) == -1) {RThrottle += $RThrottle*3} elseif(Down & sign(RThrottle) == 1) {RThrottle -= $RThrottle*3}
+    RollMod = 100/RollSpeed
+    RThrottle = clamp(RThrottle, -(1.1^RollMod + RollMod), 1.1^RollMod +RollMod)
+    R2 = root(RThrottle, RollMod) * MaxR
+}
+if(PitchSpeed==5) {
+    MaxP = 60
+    if(round(PThrottle/2) == 0) {PThrottle = 0}
+    if(D | A) {PThrottle += (D-A) + (D-A)* abs(PThrottle)*1.1} else{PThrottle -= sign(PThrottle) + sign(PThrottle) * PThrottle*1.1}
+    #if(D & sign(PThrottle) == -1) {PThrottle += $PThrottle*3} elseif(A & sign(PThrottle) == 1) {PThrottle -= $PThrottle*3}
+    PitchMod = 100/PitchSpeed
+    PThrottle = clamp(PThrottle, -(1.1^PitchMod + PitchMod), 1.1^PitchMod +PitchMod)
+    P2 = root(PThrottle, PitchMod) * MaxP
+}

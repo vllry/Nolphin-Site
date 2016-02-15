@@ -1,0 +1,240 @@
+@name Nolphin V4.7classic Engine
+@inputs Prop:entity NWire:wirelink
+@inputs W A S D Up Down OnOff ForceOff ForceOn Destination:vector X Y Z TargetP TargetR Chair:entity 
+@outputs ID Engines Speed
+@outputs FrontLeftThrust PitchThrust RollThrust RearThrust RightThrust UpThrust
+@persist Roll Yaw Pitch PThrottle RThrottle P2 R2 Engines PropB:entity ChairB:entity
+@persist ZThrust ZDiff InternalZ ZThrottle ZAdded ZAimed Z2 Throttle TopSpeed2
+@persist YForce YAdjust LocalX LocalY Yaw4 AD
+@persist Ownerpos:vector NautomatonPause Tick PList:array
+@persist YawMode TurnSpeed Friction AngFriction TopSpeed RAcceleration ZTopSpeed ZAcceleration
+@persist XYZDistance Nautomaton ZOffset RollLeaning PitchLeaning SmartZ ZGravity ZG2
+@persist StayOn AutoDetect RadiusModifier Orientation InternalCombustion
+#Nebcorp Oscillating Levitations Processor and Highly Intellegent Nolphin
+##Version 4.7classic, September 1st 09##
+
+#About the Classic release:
+#The current Nolphin chip is tightly infused with lua functions unavaliable on most servers, and hence has far
+#more functionality than that which is shown here. This is a simplified bare bones engine that should work on any
+#wire-svn server. 
+#Originally made by Nebual, of Nebtown. 24.68.133.128:27000, or nebtown.pbworks.com
+#Hi mom!
+
+if(first()) {                 ###<<< Configuration >>>###
+ 
+YawMode         = 4 # 1: Friction, yaw pressure is applied (more realistic, smoother) 2: Fixed, yaw forces itself to a given angle (useful for heavy ships) 4:PID
+    TurnSpeed   = 1  #0.2 - 4
+Friction        = 6  #2 - 50, higher reduces effect. Controls how quickly the ship comes to a stop. Default 6
+    AngFriction = 1 #0.5 - 8, higher reduces effect. Controls how strong the anglular-gyros are. Default 1
+ZGravity        = 0 #0: Hovercraft (default),  1-8: Z is off, Nolphin fakes low-medium gravity (Cars? Hang-gliders?)
+RadiusModifier  = 2 #0.2 - 2. Normally, higher is more accurate. If stability is compromised OR for narrow ships, lower this. 
+Orientation     = -2 #Alters which direction is "forward". 1:normal, -1:reversed, 2:facing right, -2:facing left
+
+TopSpeed  = 60 #2-180, in KM/H. Set to 0 for Manual Adjustments (mid-flight)
+    RAcceleration = 1 #0.2 - 4
+ZTopSpeed = 1  #0.2 - 3, The top speed going up/down.
+    ZAcceleration = 1  #0.2 - 4
+
+XYZDistance = 140 #Distance away from XYZ targets to stop at.
+Nautomaton  = 0 #Makes the Nolphin follow you around like a pet :D
+    ZOffset = 40
+
+RollLeaning  = 1  #0 disables (Left/right leaning)
+PitchLeaning = 1 #0 disables (Forward/backward leaning)
+SmartZ       = 25 #1 resets targetZ if its too distant, 0 behaves like hoverballs, snapping back to set Z.  
+ 
+#Modes
+StayOn      = 0 #Forces it on constantly (debuggin)
+AutoDetect  = 1 #Uses whatever entity the chip is sitting on by default, as the base.
+InternalCombustion = 1 #1 uses built-in thrusters, 0 is for wiring your own
+} ###<< End of Configuration >>
+ 
+#Prop:entity is wired to a source of entitydata about your ship, such as an Entity Marker
+#To use XYZ-tracking mode, wire up your desired location to the XYZ inputs, and the Nolphin will swiftly fly there.
+ 
+ 
+#Resets the chip (with a delay), which fixes some duping issues
+if(duped()) {W2 = 666, interval(300), exit()}
+if(W2 == 666) {reset()}
+
+#Finds Engine Entities
+if((clk("Rediscover Engines") | first()) & AutoDetect) {
+    TopSpeed = clamp(TopSpeed, 0, 180)
+    timer("Rediscover Engines", 4000)
+    if(!Prop) {PropB = entity():isWeldedTo()} else{PropB = Prop}
+    PList = entity():getConstraints()
+    
+    findIncludeClass("prop_vehicle_prisoner_pod")
+    Find = findInSphere(entity():toWorld(vec(0,0,25)), 150)
+    if(Find) {ChairB = findClosest(entity():pos())}
+}
+if(!Prop) {Prop = PropB}
+if(!Chair) {Chair = ChairB}
+Tick = curtime(), ID = Prop:id()
+
+if(Destination) {X = Destination:x(), Y = Destination:y(), Z = Destination:z()}
+if(Orientation == 2) {PRight = -Prop:forward(), PForward = -Prop:right(), Speed = toUnit("km/h", -Prop:velL():x())}
+elseif(Orientation == -2) {PRight = Prop:forward(), PForward = Prop:right(), Speed = toUnit("km/h", Prop:velL():x())}   
+elseif(Orientation == -1) {PRight = -Prop:right(), PForward = Prop:forward(), Speed = toUnit("km/h", Prop:velL():y())}  
+else{PRight = Prop:right(), PForward = -Prop:forward(), Speed = toUnit("km/h", -Prop:velL():y())}
+
+#Establishes Communications
+if(NWire) {W = NWire:number("W"), A = NWire:number("A"), S = NWire:number("S"), D = NWire:number("D")
+Up = NWire:number("Space"), Down = NWire:number("R"), if(changed(NWire:number("Mouse2")) & NWire:number("Mouse2")) {Engines = !Engines}}
+
+Driver = Chair:driver()
+if(Driver) {
+    if(!Driver:inVehicle()) {Driver = noentity()}
+    #Active Configuration
+    if(changed(lastSaid()) & Driver & lastSpoke() == Driver) {
+        Said = Driver:lastSaid():explode(" "), Said1 = Said:string(1):lower(), Said2 = Said:string(2):toNumber()
+        if(Said1:find("gravity"))      {ZGravity = Said2}
+        elseif(Said1 == "yawmode")     {YawMode = Said2, YForce = -Prop:angles():yaw()}
+        elseif(Said1 == "turnspeed")   {TurnSpeed = Said2}
+        elseif(Said1 == "topspeed")    {TopSpeed = clamp(Said2, 0, 180)}
+        elseif(Said1 == "friction")    {Friction = Said2}
+        elseif(Said1 == "angfriction") {AngFriction = Said2}
+        elseif(Said1:find("leaning"))  {RollLeaning = Said2, PitchLeaning = Said2}
+        elseif(Said1:find("radius"))   {Radius = Said2}
+        elseif(Said1:find("orient"))   {Orientation = Said2}
+    }
+}
+
+#Power settings
+if(~OnOff & OnOff) {Engines = !Engines}
+Engines = (Engines | ForceOn | StayOn) & !(~ForceOn & !ForceOn)
+if(Engines | Driver) {runOnTick(1)} else{interval(500), runOnTick(0)}
+
+if(Engines) {
+#Forward Thrust
+if(TopSpeed) { TopSpeed2=0
+    For1 = (W-S)* 100
+    if(Throttle > For1) {if(For1 == 0 | (For1 == -100 & (Throttle > 0))) {Throttle -= 2.1 *RAcceleration} else{Throttle -= 0.70 *RAcceleration}}
+    elseif(For1 > Throttle) {if(For1 == 0 | (For1 == 100 & (Throttle < 0))) {Throttle += 2.1 *RAcceleration} else{Throttle += 0.70 *RAcceleration}}
+    Forward = -(Speed - (TopSpeed *Throttle /100))* (W | S) }
+else{
+    if(changed(Engines + 1) & Engines) {TopSpeed2 = round(Speed*2)/2}
+    if(abs(TopSpeed2) < 10) {TopMul = 1} else{TopMul = 2}
+    if(changed(W) & W & TopSpeed2<180) {TopSpeed2 += TopMul}
+    if(changed(S) & S & TopSpeed2>-180) {TopSpeed2 -= TopMul}
+    Forward = -(Speed - TopSpeed2)
+    if(changed(TopSpeed2)) {Chair:hintDriver("Current Engine Speed: " + toString(TopSpeed2), 2)}}
+
+#Additional Z
+if(RollLeaning | ZGravity == 0) {
+    Z1=(Up-Down) * ZTopSpeed *100
+    if(Z2 > Z1) {if(Z1 == 0 | (Z1 == -(ZTopSpeed *100) & (Z2 > 0))) {Z2 -= 0.84 * ZAcceleration} else{Z2 -= 0.28 * ZAcceleration}}
+    elseif(Z1 > Z2) {if(Z1 == 0 | (Z1 == (ZTopSpeed *100) & (Z2 < 0))) {Z2 += 0.84 * ZAcceleration} else{Z2 += 0.28 * ZAcceleration}}
+    if(round(Z2 / 5) == 0) {ZThrottle = 0} else{ZThrottle = Z2 / 5}
+    ZAdded += ZThrottle
+}
+
+R2 = clamp(ZThrottle, -15, 15)*3*RollLeaning
+if(PitchLeaning) {
+    P1 = (D-A) *45*PitchLeaning
+    if((P2 < P1) & (P2 > P1 + 1)) {P2 = 0} #Filters out petty decimals like 0.31
+    elseif(P2 > P1) {if(P1==0 | (A & (P2 > 0))) {P2 -= 0.9} else{P2 -= 0.3}} 
+    elseif(P1 > P2) {if(P1==0 | (D & (P2 < 0))) {P2 += 0.9} else{P2 += 0.3}}
+}
+
+Pitch = Prop:angles():pitch() - TargetP
+Roll = Prop:angles():roll() - TargetR
+FForward = 0, RForward = 0
+if(Orientation == 2) {TarP = ($Pitch*8+Pitch) - R2, TarR = ($Roll*8+Roll) + P2          FForward =-Forward}
+elseif(Orientation == -2) {TarP = ($Pitch*8+Pitch) + R2, TarR = ($Roll*8+Roll) - P2,    FForward = Forward}
+elseif(Orientation == -1) {TarP = ($Pitch*8+Pitch) - P2, TarR = ($Roll*8+Roll) - R2,    RForward =-Forward}
+else{TarP = ($Pitch*8+Pitch) + P2, TarR = ($Roll*8+Roll) + R2,                          RForward = Forward}
+
+#Nautomaton overrides normal XYZ inputs
+if(Nautomaton) {
+    YawMode = 1, SmartZ = 12, XYZDistance = max(XYZDistance, 125), Engines = 1
+    if(Prop:pos():distance(owner():pos()) > XYZDistance) {Ownerpos = owner():pos() + vec(0, 0, ZOffset), NautomatonPause = 0}
+    elseif(!NautomatonPause) {Ownerpos = vec(Prop:pos():x(), Prop:pos():y(), owner():pos():z() + ZOffset), NautomatonPause = 1}
+    X = Ownerpos:x(), Y = Ownerpos:y(), Z = Ownerpos:z()
+}
+
+#MAIN THRUST: XYZ tracking Mode
+if(Z) { 
+    if(!ZAimed) {ZAimed = Prop:pos():z()}
+    SubtractedV = clamp(vec(X - Prop:pos():x(), Y - Prop:pos():y(), Z - Prop:pos():z()), -TopSpeed*2, TopSpeed*2)
+    LocalX = SubtractedV:dot(Prop:forward())
+    LocalY = SubtractedV:dot(Prop:right())
+    LocalZ = SubtractedV:dot(Prop:up())
+    XSlow = (-($LocalX*10 + LocalX) + (Prop:velL():x() /Friction)) /2
+    YSlow = ( ($LocalY*10 + LocalY) + (Prop:velL():y() /Friction)) /2  
+    if(abs(Z - Prop:pos():z()) > SmartZ) {ZAimed += sign(Z - Prop:pos():z()) * TopSpeed/6} #7.5 more precise, 6 more practical
+    if(SmartZ) {if(ZDiff > SmartZ) {ZAimed -= (ZDiff-SmartZ)} elseif(ZDiff < -SmartZ) {ZAimed -= (ZDiff+SmartZ)}}
+    ZDiff = -Prop:pos():z() + ZAimed
+    ZThrust =  $ZDiff*10 + ZDiff 
+}
+
+if(!InternalZ) {InternalZ = Prop:pos():z() + 35}
+
+#MAIN THRUST: Friction Mode
+if(!Z) { 
+    YFriction = Prop:velL():y() / Friction
+    XFriction = Prop:velL():x() / Friction
+    if(Orientation==-2)    {YSlow=YFriction, if(XFriction<0 & !S) {XSlow=XFriction} elseif(XFriction>0 & !W) {XSlow=XFriction} else{XSlow=0}}
+    elseif(Orientation==2) {YSlow=YFriction, if(XFriction<0 & !W) {XSlow=XFriction} elseif(XFriction>0 & !S) {XSlow=XFriction} else{XSlow=0}}
+    elseif(Orientation==-1){XSlow=XFriction, if(YFriction<0 & !S) {YSlow=YFriction} elseif(YFriction>0 & !W) {YSlow=YFriction} else{YSlow=0}}
+    else                   {XSlow=XFriction, if(YFriction<0 & !W) {YSlow=YFriction} elseif(YFriction>0 & !S) {YSlow=YFriction} else{YSlow=0}}
+   
+    if(ZGravity) {ZThrust = 6 - ZGravity}
+    else{
+        if(SmartZ) {if(ZDiff > SmartZ) {ZAdded -= (ZDiff-SmartZ)} elseif(ZDiff < -SmartZ) {ZAdded -= (ZDiff+SmartZ)}}
+        ZDiff = InternalZ - Prop:pos():z() + ZAdded
+        ZThrust = ZDiff + $ZDiff * 5
+    }
+}
+
+#Yaw
+if(YawMode == 1) { #Friction based
+    TarY = (D - A)* (0.8 + abs(Prop:velL():x()) /Friction /200)*TurnSpeed + ((!A & !D) * Prop:angVel():yaw() / AngFriction) }
+elseif(YawMode == 2) { #Forced Yaw based
+    if(changed(Engines + 5)) {YForce = -Prop:angles():yaw()} #If we just turned on
+    YForce += (D - A)* 1.4 * TurnSpeed
+    if    (YForce < -179.9) {YForce = 179.9}
+    elseif(YForce > 179.9) {YForce = -179.9}
+    YAdjust = angnorm(Prop:angles():yaw() + YForce)
+    TarY = ($YAdjust * 10 + YAdjust) *TurnSpeed}
+elseif(YawMode == 3) { #For Nautomaton Use
+    YAdjust = angnorm(Prop:bearing(Ownerpos) + 5)
+    TarY = ($YAdjust * 10 + YAdjust)}
+elseif(YawMode == 4) { 
+    if((A | D) & abs(AD) < 1) {AD += (A-D)/33} else{AD -= sign(AD)/11}
+    if(abs(AD) > 0.07) {TarY = (Prop:angVel():yaw() - ( AD*15*TurnSpeed ) * (1 + (toUnit("km/h", abs(Prop:velL():length())) /max(TopSpeed, TopSpeed2))))}
+    else{TarY = ((!A & !D) * Prop:angVel():yaw() / AngFriction) }}
+else{TarY = (D - A) * TurnSpeed} #Default to basic
+
+
+if(InternalCombustion) {
+    #Internal Thrusters
+    Weight = Prop:mass() * 0.8
+    Radius = Prop:radius() * RadiusModifier
+    CMass = Prop:massCenterL()
+    Inertia = Prop:inertia() / 5 /AngFriction
+    if(Prop:type() == "prop_ragdoll") {Radius = 100, Weight = 100}
+    
+    Prop:applyForce(vec(0,0,ZThrust) *Weight*4) #Primary Z
+    Prop:applyForce(Prop:forward() * (-XSlow + FForward*16) * Weight/2) #X Friction + Forward/Back
+    Prop:applyForce(Prop:right()  *  (YSlow + RForward*16) * Weight/2)  #Y Friction + Forward/Back
+    
+    Prop:applyOffsetForce( TarR *Prop:up() *Inertia:x(), Prop:toWorld(vec(0,-Radius,0)) + CMass)
+    Prop:applyOffsetForce(-TarR *Prop:up() *Inertia:x(), Prop:toWorld(vec(0, Radius,0)) + CMass)
+    Prop:applyOffsetForce( TarP *Prop:up() *Inertia:y(), Prop:toWorld(vec( Radius,0,0)) + CMass)
+    Prop:applyOffsetForce(-TarP *Prop:up() *Inertia:y(), Prop:toWorld(vec(-Radius,0,0)) + CMass)
+    Prop:applyOffsetForce( TarY *Prop:right() *Inertia:z()/2, Prop:toWorld(vec( Radius,-Radius,0)) + CMass)
+    Prop:applyOffsetForce(-TarY *Prop:right() *Inertia:z()/2, Prop:toWorld(vec(-Radius, Radius,0)) + CMass)
+}#External Thrusters
+else{
+    RearThrust = -XSlow + FForward*16
+    RightThrust = YSlow + RForward*16
+    FrontLeftThrust = TarY
+    PitchThrust = TarP
+    RollThrust = TarR
+    UpThrust = ZThrust
+}
+}#Closes if(Engines)
+
+#Resets Variables when off
+elseif(changed(Engines + 4)) {ZAdded =0, InternalZ =0, Z2 =0, Throttle =0, YAdjust =0, Forward =0, ZThrottle =0, TopSpeed2 = 0}
