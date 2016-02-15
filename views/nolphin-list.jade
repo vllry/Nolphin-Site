@@ -22,69 +22,33 @@ block page
 
   br
 
-  // /.row
-  // Projects Row
-  .row
-    .col-md-6.img-portfolio
-      a(href='portfolio-item.html')
-        img.img-responsive.img-hover(src='http://placehold.it/700x400', alt='')
-      h3
-        a(href='portfolio-item.html') Project One
-      p
-        | Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam viverra euismod odio, gravida pellentesque urna varius vitae.
-    .col-md-6.img-portfolio
-      a(href='portfolio-item.html')
-        img.img-responsive.img-hover(src='http://placehold.it/700x400', alt='')
-      h3
-        a(href='portfolio-item.html') Project Two
-      p
-        | Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam viverra euismod odio, gravida pellentesque urna varius vitae.
-  // /.row
-  // Projects Row
-  .row
-    .col-md-6.img-portfolio
-      a(href='portfolio-item.html')
-        img.img-responsive.img-hover(src='http://placehold.it/700x400', alt='')
-      h3
-        a(href='portfolio-item.html') Project Three
-      p
-        | Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam viverra euismod odio, gravida pellentesque urna varius vitae.
-    .col-md-6.img-portfolio
-      a(href='portfolio-item.html')
-        img.img-responsive.img-hover(src='http://placehold.it/700x400', alt='')
-      h3
-        a(href='portfolio-item.html') Project Four
-      p
-        | Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam viverra euismod odio, gravida pellentesque urna varius vitae.
-  // /.row
-  // Projects Row
-  .row
-    .col-md-6.img-portfolio
-      a(href='portfolio-item.html')
-        img.img-responsive.img-hover(src='http://placehold.it/700x400', alt='')
-      h3
-        a(href='portfolio-item.html') Project Six
-      p
-        | Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam viverra euismod odio, gravida pellentesque urna varius vitae.
-  // /.row
-  hr
-  // Pagination
-  .row.text-center
-    .col-lg-12
-      ul.pagination
-        li
-          a(href='#') «
-        li.active
-          a(href='#') 1
-        li
-          a(href='#') 2
-        li
-          a(href='#') 3
-        li
-          a(href='#') 4
-        li
-          a(href='#') 5
-        li
-          a(href='#') »
-  // /.row
+
+
+  - var column = 0
+  - var rows = []
+  - var row_count = 0
+  each model,name in models
+    if !column
+      - rows[row_count] = []
+    - rows[row_count][column] = model
+    - rows[row_count][column]['version'] = name
+
+    if !column
+      - column = 1
+    else
+      - column = 0
+      - row_count = row_count + 1
+
+
+  each row in rows
+    .row
+      for col in [0,1]
+        if row[col]
+          .col-md-6.img-portfolio
+            a(href='/generations/'+generation+'/'+row[col]['version'])
+              img.img-responsive.img-hover(src='http://placehold.it/700x400', alt='')
+            h3
+              a(href='/generations/'+generation+'/'+row[col]['version'])
+                = row[col]['version']
+            p= row[col]['description']
 

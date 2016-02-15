@@ -2,6 +2,8 @@ var express = require('express');
 var fs = require('fs');
 var path = require('path');
 
+var nolphinlib = require('../nolphins/nolphinlib');
+
 var router = express.Router();
 
 
@@ -17,7 +19,7 @@ router.get('/', function(req, res) {
 		});
 	}
 
-	var generations = {};
+	var generations = [];
 	var gens = 5;
 	
 	function readGenInfo(i) {
@@ -25,10 +27,10 @@ router.get('/', function(req, res) {
 			if (err) {
 				console.log(err);
 			}
-			generations[i] = {
+			generations.push({
 				'gen' : i,
 				'info' : JSON.parse(info)
-			}
+			})
 			if (i > 1) {
 				readGenInfo(i-1, doneFunc);
 			}
@@ -50,7 +52,8 @@ router.get('/:generation', function(req, res) {
 		generation: req.params.generation,
 		name: info.name,
 		name_full: info.name_full,
-		description: info.description
+		description: info.description,
+		models: nolphinlib.listModelsSync(req.params.generation, true)
 	});
 });
 

@@ -1,10 +1,10 @@
 var express = require('express');
-var router = express.Router();
 var path = require('path');
-
 var fs = require('fs');
 
+var nolphinlib = require('../nolphins/nolphinlib');
 
+var router = express.Router();
 
 
 
@@ -15,15 +15,15 @@ router.get('/', function(req, res) {
 
 
 function getDirectories(srcpath) {
-  return fs.readdirSync(srcpath).filter(function(file) {
-    return fs.statSync(path.join(srcpath, file)).isDirectory();
-  });
+	return fs.readdirSync(srcpath).filter(function(file) {
+		return fs.statSync(path.join(srcpath, file)).isDirectory();
+	});
 }
 
 function getFiles(srcpath) {
-  return fs.readdirSync(srcpath).filter(function(file) {
-    return fs.statSync(path.join(srcpath, file)).isFile();
-  });
+	return fs.readdirSync(srcpath).filter(function(file) {
+		return fs.statSync(path.join(srcpath, file)).isFile();
+	});
 }
 
 //I tried to async this and Gave Up
@@ -52,6 +52,14 @@ var findSuitableNolphin = function(genDir, downloadType, devVersion, funcOk) {
 
 }
 
+
+
+router.get('/download/:generation', function(req, res) {
+	res.json(nolphinlib.listModelsSync(req.params.generation, true));
+});
+
+
+
 router.get('/download/:generation/:downloadType', function(req, res) {
 	var generation = req.params.generation;
 	var downloadType = req.params.downloadType;
@@ -63,7 +71,8 @@ router.get('/download/:generation/:downloadType', function(req, res) {
 			return;
 		}
 
-		findSuitableNolphin(dir, downloadType, req.query.dev, function(nolphin) {
+		var devVersion = req.query.dev || 0;
+		findSuitableNolphin(dir, downloadType, Number(devVersion), function(nolphin) {
 			res.json(nolphin);
 		});
 	});
