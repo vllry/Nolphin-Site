@@ -53,6 +53,7 @@ router.get('/:generation', function(req, res) {
 		name: info.name,
 		name_full: info.name_full,
 		description: info.description,
+		downloadTypes: info.downloadTypes,
 		models: nolphinlib.listModelsSync(req.params.generation, true)
 	});
 });

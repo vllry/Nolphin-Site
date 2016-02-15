@@ -80,4 +80,23 @@ router.get('/download/:generation/:downloadType', function(req, res) {
 
 
 
+router.get('/download/:generation/:version/:downloadType', function(req, res) {
+	var generation = req.params.generation;
+	var version = req.params.version;
+	var downloadType = req.params.downloadType;
+	var dir = path.join(__dirname, '../nolphins/' + generation + '/' + version + '/' + downloadType);
+
+	fs.readdir(dir, function(err, subversions) {
+		if (err) {
+			res.json({'success':false, 'err':err})
+			return;
+		}
+		console.log(dir);
+		console.log(subversions);
+		res.send(fs.readFileSync(path.join(dir, subversions[0]), "utf8"));
+	});
+});
+
+
+
 module.exports = router;

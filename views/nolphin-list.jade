@@ -50,5 +50,13 @@ block page
             h3
               a(href='/generations/'+generation+'/'+row[col]['version'])
                 = row[col]['version']
+            ul.list-inline
+              -if (row[col]['downloadTypes'].indexOf('e2') > -1)
+                li
+                  a(href='/api/download/'+generation+'/'+row[col]['version']+'/e2')
+                    img(src='/icons/24/e2.png')
+              -if (row[col]['downloadTypes'].indexOf('advdupe') > -1)
+                li
+                  a(href='/api/download/'+generation+'/'+row[col]['version']+'/advdupe')
+                    img(src='/icons/24/toolgun.png')
             p= row[col]['description']
-
