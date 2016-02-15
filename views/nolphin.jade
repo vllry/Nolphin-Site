@@ -1,0 +1,70 @@
+extends layout
+
+
+
+block page
+
+  // Page Heading/Breadcrumbs
+  .row
+    .col-lg-12
+      h1.page-header
+        = "Nolphin v" + version + " "
+        small= name
+        br
+        small= name_full
+      ol.breadcrumb
+        li
+          a(href='/generations') Generations 
+        li
+          a(href='/generations/'+generation)= "Nolphin v" + generation
+        li.active= "Nolphin v" + version
+
+  .row
+    .col-md-8
+      #carousel-example-generic.carousel.slide(data-ride='carousel')
+        // Indicators
+        ol.carousel-indicators
+          li.active(data-target='#carousel-example-generic', data-slide-to='0')
+          li(data-target='#carousel-example-generic', data-slide-to='1')
+          li(data-target='#carousel-example-generic', data-slide-to='2')
+        // Wrapper for slides
+        .carousel-inner
+          .item.active
+            img.img-responsive(src='http://placehold.it/750x500', alt='')
+          .item
+            img.img-responsive(src='http://placehold.it/750x500', alt='')
+          .item
+            img.img-responsive(src='http://placehold.it/750x500', alt='')
+        // Controls
+        a.left.carousel-control(href='#carousel-example-generic', data-slide='prev')
+          span.glyphicon.glyphicon-chevron-left
+        a.right.carousel-control(href='#carousel-example-generic', data-slide='next')
+          span.glyphicon.glyphicon-chevron-right
+    .col-md-4
+      h3 Project Description
+      p
+        | Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam viverra euismod odio, gravida pellentesque urna varius vitae. Sed dui lorem, adipiscing in adipiscing et, interdum nec metus. Mauris ultricies, justo eu convallis placerat, felis enim.
+      h3 Project Details
+      ul
+        li Lorem Ipsum
+        li Dolor Sit Amet
+        li Consectetur
+        li Adipiscing Elit
+  // /.row
+  // Related Projects Row
+  .row
+    .col-lg-12
+      h3.page-header Related Projects
+    .col-sm-3.col-xs-6
+      a(href='#')
+        img.img-responsive.img-hover.img-related(src='http://placehold.it/500x300', alt='')
+    .col-sm-3.col-xs-6
+      a(href='#')
+        img.img-responsive.img-hover.img-related(src='http://placehold.it/500x300', alt='')
+    .col-sm-3.col-xs-6
+      a(href='#')
+        img.img-responsive.img-hover.img-related(src='http://placehold.it/500x300', alt='')
+    .col-sm-3.col-xs-6
+      a(href='#')
+        img.img-responsive.img-hover.img-related(src='http://placehold.it/500x300', alt='')
+

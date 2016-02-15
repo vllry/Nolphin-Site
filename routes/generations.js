@@ -44,6 +44,7 @@ router.get('/', function(req, res) {
 });
 
 
+
 router.get('/:generation', function(req, res) {
 	var info = require('../nolphins/'+req.params.generation+'/info');
 	res.render('nolphin-list', {
@@ -53,8 +54,23 @@ router.get('/:generation', function(req, res) {
 		name: info.name,
 		name_full: info.name_full,
 		description: info.description,
-		downloadTypes: info.downloadTypes,
 		models: nolphinlib.listModelsSync(req.params.generation, true)
+	});
+});
+
+
+
+router.get('/:generation/:version', function(req, res) {
+	var generation = req.params.generation;
+	var version = req.params.version;
+	var info = fs.readFileSync(path.join(__dirname, '../nolphins/'+generation+'/'+version+'/info.json'), 'utf8');
+	res.render('nolphin', {
+		title: 'v'+version,
+		activePage: 'generations',
+		generation: generation,
+		description: info['description'],
+		'version': version,
+		models: nolphinlib.listModelsSync(generation, true)
 	});
 });
 
