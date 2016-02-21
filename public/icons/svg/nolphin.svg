@@ -16,9 +16,9 @@
    version="1.1"
    inkscape:version="0.91 r13725"
    sodipodi:docname="nolphin.svg"
-   inkscape:export-filename="/home/vallery/Desktop/nolphin-site/public/icons/nolphin.png"
-   inkscape:export-xdpi="17.578125"
-   inkscape:export-ydpi="17.578125">
+   inkscape:export-filename="/home/vallery/Desktop/nolphin-site/public/icons/nolphin_big.png"
+   inkscape:export-xdpi="140.625"
+   inkscape:export-ydpi="140.625">
   <sodipodi:namedview
      id="base"
      pagecolor="#ffffff"
@@ -27,7 +27,7 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="1.979899"
-     inkscape:cx="146.72742"
+     inkscape:cx="-26.51374"
      inkscape:cy="148.40305"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
@@ -37,7 +37,7 @@
      inkscape:window-x="0"
      inkscape:window-y="27"
      inkscape:window-maximized="1"
-     showguides="true"
+     showguides="false"
      inkscape:guide-bbox="true" />
   <defs
      id="defs4">

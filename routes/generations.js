@@ -63,14 +63,15 @@ router.get('/:generation', function(req, res) {
 router.get('/:generation/:version', function(req, res) {
 	var generation = req.params.generation;
 	var version = req.params.version;
-	var info = fs.readFileSync(path.join(__dirname, '../nolphins/'+generation+'/'+version+'/info.json'), 'utf8');
+	//var genInfo = fs.readFileSync(path.join(__dirname, '../nolphins/'+generation+'/'+version+'/info.json'), 'utf8');
 	res.render('nolphin', {
 		title: 'v'+version,
 		activePage: 'generations',
 		generation: generation,
-		description: info['description'],
+		//description: info['description'],
+		//name: info['name'],
 		'version': version,
-		models: nolphinlib.listModelsSync(generation, true)
+		info: nolphinlib.listVersionModelsSync(generation, version, true)
 	});
 });
 

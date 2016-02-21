@@ -9,7 +9,7 @@ block page
     .col-lg-12
       h1.page-header
         = "Nolphin v" + version + " "
-        small= name
+        small= info.name
         br
         small= name_full
       ol.breadcrumb
@@ -41,12 +41,5 @@ block page
         a.right.carousel-control(href='#carousel-example-generic', data-slide='next')
           span.glyphicon.glyphicon-chevron-right
     .col-md-4
-      h3 Project Description
-      p
-        | Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam viverra euismod odio, gravida pellentesque urna varius vitae. Sed dui lorem, adipiscing in adipiscing et, interdum nec metus. Mauris ultricies, justo eu convallis placerat, felis enim.
-      h3 Project Details
-      ul
-        li Lorem Ipsum
-        li Dolor Sit Amet
-        li Consectetur
-        li Adipiscing Elit
+      h3= info.name
+      p= info.description
