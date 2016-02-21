@@ -21,26 +21,36 @@ exports.getFilesSync = getFilesSync;
 
 
 
+function listVersionModelsSync(generation, model) {
+	var genDir = path.join(__dirname, generation);
+	var modelDir = path.join(genDir, model);
+	var info = JSON.parse(fs.readFileSync(path.join(modelDir, 'info.json'), "utf8"));
+
+	downloadTypes = [];
+	if (fs.existsSync(path.join(modelDir,'advdupe'))) {
+		downloadTypes.push('advdupe');
+	}
+	if (fs.existsSync(path.join(modelDir,'e1'))) {
+		downloadTypes.push('e1');
+	}
+	if (fs.existsSync(path.join(modelDir,'e2'))) {
+		downloadTypes.push('e2');
+	}
+	info['downloadTypes'] = downloadTypes;
+
+	return info;
+}
+exports.listVersionModelsSync = listVersionModelsSync;
+
+
+
 exports.listModelsSync = function(generation, mainLine) {
 	var dict = {};
 
 	var genDir = path.join(__dirname, generation);
 	models = getDirectoriesSync(genDir);
 	for (var i=0; i < models.length; i++) {
-		var info = JSON.parse(fs.readFileSync(path.join(genDir, models[i]+'/info.json'), "utf8"));
-		var modelDir = path.join(genDir, models[i]);
-		downloadTypes = [];
-		if (fs.existsSync(path.join(modelDir,'advdupe'))) {
-			downloadTypes.push('advdupe');
-		}
-		if (fs.existsSync(path.join(modelDir,'e1'))) {
-			downloadTypes.push('e1');
-		}
-		if (fs.existsSync(path.join(modelDir,'e2'))) {
-			downloadTypes.push('e2');
-		}
-		info['downloadTypes'] = downloadTypes;
-		dict[models[i]] = info;
+		dict[models[i]] = listVersionModelsSync(generation, models[i]);
 	}
 	return dict;
 };
