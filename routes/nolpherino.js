@@ -4,9 +4,9 @@ var router = express.Router();
 
 
 router.get('/', function(req, res) {
-	res.render('nolphiner', {
-		title: 'Nolphiner Chip',
-		activePage: 'nolphiner'
+	res.render('nolpherino', {
+		title: 'Nolpherino Chip',
+		activePage: 'nolpherino'
 	});
 });
 

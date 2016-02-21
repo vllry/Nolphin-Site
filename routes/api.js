@@ -93,7 +93,7 @@ router.get('/download/:generation/:version/:downloadType', function(req, res) {
 		}
 		console.log(dir);
 		console.log(subversions);
-		res.send(fs.readFileSync(path.join(dir, subversions[0]), "utf8"));
+		res.download(path.join(dir, subversions[0]), subversions[0]);
 	});
 });
 
