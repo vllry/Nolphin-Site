@@ -1,0 +1,261 @@
+@name Nolphin V4 Engine
+@inputs Chair:entity NWire:wirelink Prop:entity Prop2:entity Prop3:entity Prop4:entity Prop5:entity
+@inputs X Y Z TargetP TargetR
+@inputs W A S D Up Down OnOff ForceOff ForceOn
+@outputs ID On X Y Z Eye:vector FreeSpeed Y2
+@persist Roll Yaw Pitch P2 R2 Engines ForceOn PropB:entity NAPCB:entity
+@persist ZThrust DiffZ InternalZ ZForce AddedZ Z2 For2
+@persist YForce YAdjust LocalX LocalY I HoldM2 On Shift2 FreeCam FC2 X Y Z
+#Nebcorp automatic hovering gyrations and maneuverabilities calculation and excecution chip#
+##Version 4.0##
+#Most recent time I adjusted the date#
+##March 9th##
+ 
+###<< Configuration >>
+ 
+#Yaw (turning) Mode:
+#1: "Friction based", for more realistic turning (if you are spun, the ship stabalizes at current Yaw)
+#2: "Fixed Yaw", ideal for more controlled turning (if you are spun, the ship returns to your desired Yaw)
+YawMode = 1
+ 
+RollLeaning = 1  #0 disables (Left/right leaning)
+PitchLeaning = 1  #0 disables (Forward/backward leaning)
+SmartZ = 1 #0 behaves like hoverballs, snapping back to set Z. 1 resets targetZ if its too distant (recommended)
+ 
+RSpeed = 2  #0.2 - 10, The primary speed control multiplier for forward/back motions. Default 1
+TSpeed = 1  #0.2 - 4, The turning speed control multiplier. Default 1
+ZAcceleration = 1  #0.2 - 4, The speed of acceleration for going up/down. Default 1
+ZTopSpeed = 1  #0.2 - 3, The top speed going up/down. Default 1
+ 
+Friction = 5  #1 - 60, higher reduces effect. Controls how quickly the ship comes to a stop. Default 5
+ 
+RangerMode = 1 #Uses whatever entity the chip is sitting on, rather than the inputted.
+StayOn = 0 #Forces it on without needing an input; for debuggin.
+NAPCOn = 1 #Nebcorp Pod Controller mode, auto detects vehicle on top and sets it as driver.
+Nautomaton = 0 #Makes the Nolphin follow you around like a workbench :D
+ 
+#Troubleshooting:
+RadiusModifier = 1 #0.2 - 2. Normally, higher is more accurate. If stability is compromised OR for thin ships, lower this. 
+YawInvert = 0 #0 off, 1 on. If the ship keeps irrationally spinning, try switching this.
+Orientation = "forward" #Often throwing "right" in here fixes problems, as some props, like SBMP, do not face forwards. 
+ 
+#Things you probably should never ever modify upon pain of death
+RagdollMode = 0 #KEEP OFF
+ 
+###<< End of Configuration >>
+ 
+#NOTES ON INPUTS:
+#Prop:entity is wired to a source of entitydata about your ship, such as an Entity Marker
+#Z overrides the height controls and simply hovers at the inputted height.
+#To use XYZ-tracking mode, wire up your desired location to the XYZ inputs, and the Nolphin will swiftly fly there.
+ 
+ 
+ 
+ 
+#Establishes communication with a NAPC [nay-pee-sea]
+if(NAPCOn) {NAPCA = ranger(25):entity(), if(NAPCA:isVehicle()) {NAPCB = NAPCA}
+if(Chair) {NAPCB = Chair}
+Driver = NAPCB:driver()
+W = Driver:keyW(), A = Driver:keyA(), S = Driver:keyS(), D = Driver:keyD()
+Up = Driver:keySpace(), Down = Driver:keyR(), if(Driver:keyMouse2() & !HoldM2) {Engines = !Engines}, HoldM2 = Driver:keyMouse2()
+}
+if(NWire) {
+W = NWire:number("W"), A = NWire:number("A"), S = NWire:number("S"), D = NWire:number("D")
+if(NWire:number("Mouse2")) {Engines = !Engines}, Up = NWire:number("Space"), Down = NWire:number("R")
+}
+ 
+#Declares common variables
+On = Engines
+if(On | Driver) {interval(20)} else{interval(500)}
+if(RangerMode) {R = ranger(-25):entity(), if(R != entity() & R) {PropB = R}, Prop = PropB}
+ID = Prop:id()
+if(Nautomaton) {YawMode = 3, P = owner():pos(), X = P:x(), Y = P:y() + 200, Z = P:z() + 40, NautoPitch = -45} else{NautoPitch = 0}
+Pitch = Prop:angles():pitch() - TargetP - NautoPitch
+Yaw = Prop:angles():yaw()
+Roll = Prop:angles():roll() - TargetR
+TarR=(($Roll)*8+Roll) + (R2 *0.45 *RollLeaning)
+TarP=(($Pitch)*8+Pitch) + (P2 *PitchLeaning)
+GPSMode = (X & Y & Z) #When to activate GPSMode
+ 
+#Power settings
+if(~OnOff & OnOff) {Engines = !Engines}
+if(ForceOff) {Engines = 0} 
+if(ForceOn) {Engines = 1} elseif(~ForceOn & !ForceOn) {Engines = 0}
+if(StayOn) {Engines = 1}
+
+#Orientation Fun
+if(Orientation == "right") {PForward = Prop:right(), PRight = -Prop:forward(), I = -1}
+elseif(Orientation == "left") {PForward = -Prop:right(), PRight = Prop:forward()}   
+elseif(Orientation == "reverse") {PForward = -Prop:forward(), PRight = -Prop:right(), I = 1}  
+else{PForward = Prop:forward(), PRight = Prop:right(), I = 1}
+if(I == -1) {WI = W, SI = S, AI = A, DI = D
+W = SI, S = WI, A = DI, D = AI}
+
+#Forward Thrust, smoothened
+For1 = (W-S) *100
+if(For2 > For1) {if(For1 == 0 | (For1 == -100 & (For2 > 0))) {For2 -= 2.1} else{For2 -= 0.70}}
+elseif(For1 > For2) {if(For1 == 0 | (For1 == 100 & (For2 < 0))) {For2 += 2.1} else{For2 += 0.70}}
+if(For2 < 1 & For2 > 0) {Forward = 0} else{Forward = For2 / 333}
+
+#Additional Z to add, smoothened
+Z3 = ZTopSpeed *100
+Z1=(Up-Down)* Z3
+if(Z2 > Z1) {if(Z1 == 0 | (Z1 == -Z3 & (Z2 > 0))) {Z2 -= 0.84 * ZAcceleration} else{Z2 -= 0.28 * ZAcceleration}}
+elseif(Z1 > Z2) {if(Z1 == 0 | (Z1 == Z3 & (Z2 < 0))) {Z2 += 0.84 * ZAcceleration} else{Z2 += 0.28 * ZAcceleration}}
+if(round(Z2 / 5) == 0) {ZForce = 0} else{ZForce = Z2 / 5}
+AddedZ += ZForce
+
+#Additional Roll, smoothened
+if(ZForce > 15) {R2 = 45*I} elseif(ZForce < -15) {R2 = -45*I} else{R2 = ZForce*I * 3}
+
+#Additional Pitch, smoothened
+P1 = (D - A) * 100
+if((P2 < P1) & (P2 > P1 + 1)) {P2 = 0} #Filters out petty decimals like 0.31
+elseif(P2 > P1) {if(P1==0 | (P1 == -100 & (P2 > 0))) {P2 -= 0.9} else{P2 -= 0.3}} 
+elseif(P1 > P2) {if(P1==0 | (P1 == 100 & (P2 < 0))) {P2 += 0.9} else{P2 += 0.3}}
+
+#Z Control
+if(InternalZ == 0) {InternalZ = Prop:pos():z() + 35}
+if(Z != 0) { #If we're recieving a target Z to go to, go.
+DiffZ = Z - Prop:pos():z()
+ZThrust = -(DiffZ + $DiffZ * 15)  
+} else { #Otherwise, default to current position.
+DiffZ = InternalZ - Prop:pos():z() + AddedZ
+if(SmartZ)   { #Config switch
+if(DiffZ > 28) {AddedZ -= (DiffZ - 28)} #Resets if we're waaay below target.
+elseif(DiffZ < -28) {AddedZ -= (DiffZ + 28)}   } #Resets if we're waaay above target.
+ZThrust = -(DiffZ + $DiffZ * 5)}
+
+#Freecam Mode
+if(Driver:keyShift() & Shift2 != Driver:keyShift()) {FreeCam = !FreeCam}
+Shift2 = Driver:keyShift()
+if(FreeCam & !X) {X = Prop:pos():x(), Y = Prop:pos():y(), Z = Prop:pos():z()}
+FreeSpeed = abs(Forward) * RSpeed*800
+if(FreeCam) {Eye = Driver:eye(), Eye2 = Eye - Prop:forward()
+if(W) {X += Eye:x() * FreeSpeed, Y += Eye:y() * FreeSpeed, Z += Eye:z() * FreeSpeed}
+if(S) {X -= Eye:x() * FreeSpeed, Y -= Eye:y() * FreeSpeed, Z -= Eye:z() * FreeSpeed}
+R2 = Eye2:z() * 45
+#Y2 = sign(Eye:y())*acos(Eye:setZ(0):normalized():dot(vec(1,0,0)))
+#Y2 = Eye:y() * 180
+#Y2 = -Prop:bearing(vec(X,Y,Z))
+#Y2 = angnorm(-Eye:toAngle():yaw())
+#QQ = Eye - vec(cos(Prop:angles():pitch()), cos(Prop:angles():yaw()), cos(Prop:angles():roll()))
+#Y2 = acos(QQ:y()) * sign(Eye:y()) 
+#YawMode = 4
+GPSMode = 1
+} elseif(FC2) {X = 0, Y = 0, Z = 0}
+FC2 = FreeCam
+
+#XY OR Friction, Rear/Right Maneouverability Thrusters
+if(GPSMode == 0) { #Friction mode
+YFriction = Prop:velL():y() / Friction
+if(YFriction < 0 & !W) {YSlow = YFriction} elseif(YFriction > 0 & !S) {YSlow = YFriction} else{YSlow = 0} 
+Rear = (Prop:velL():x() / Friction)
+Right = 40 * Forward * RSpeed + YSlow
+}
+elseif(GPSMode == 1) { #XY tracking Mode
+SubtractedV = vec(X - Prop:pos():x(), Y - Prop:pos():y(), Z - Prop:pos():z())
+LocalX = SubtractedV:dot(Prop:forward())
+LocalY = SubtractedV:dot(Prop:right())
+Rear =  (  (-($LocalX*4 + LocalX) / 7.5) + (Prop:velL():x() / Friction)  ) / 2
+Right = (  (($LocalY*4 + LocalY) / 7.5) + (Prop:velL():y() /Friction)  ) /2  
+}
+
+#Yaw, FLSide thruster
+if(YawMode == 1) { #Friction based
+FLSide = (D - A)*I * (0.8 + abs(Prop:velL():x()) /Friction /250) + ((!A & !D) * Prop:angVel():yaw() / Friction) }
+elseif(YawMode == 2) { #Forced Yaw based
+if(!Engines) {YForce = -Yaw}
+YForce += (D - A)*I * 1.4 * TSpeed
+if(YForce < -179) {YForce = 179}
+if(YForce > 179) {YForce = -179}
+YAdjust = angnorm(Yaw + YForce)
+FLSide = ($YAdjust * 10 + YAdjust) *TSpeed}
+elseif(YawMode == 3) {
+YAdjust = angnorm(entity():bearing(owner():pos()) + 5)
+FLSide = ($YAdjust * 10 + YAdjust)}
+elseif(YawMode == 4) {
+YAdjust = angnorm(Yaw - Y2)
+FLSide = ($YAdjust * 10 + YAdjust)}
+else{FLSide = (D - A) * TSpeed} #Default to basic
+
+#Turns it off + resets
+if(!Engines) {AddedZ = 0, InternalZ = Prop:pos():z()+35, Z2 = 0, For2 = 0
+North = 0, East = 0, South = 0, West = 0, Rear = 0, Right = 0, FLSide = 0, ZThrust = 0}
+
+
+#Internal Thruster Variables
+Weight = Prop:mass() * 0.8
+Radius = Prop:radius() * RadiusModifier
+CMass = Prop:massCenterL()
+if(RagdollMode) {Radius = 100, Weight = 100} #Lawl
+if(YawInvert) {YI = -1} else{YI = 1} #Negates the yaw thruster, see config
+
+#Applies the actual thrust
+if(On) {
+Prop:applyForce(vec(0,0,-ZThrust) *Weight*4) #Primary Z
+Prop:applyForce(PForward * -Rear * Weight/2) #Rear, handles movement and friction
+Prop:applyForce(PRight   * Right * Weight/2) #Right, handles friction
+
+Prop:applyOffsetForce( TarP *Prop:up() *Prop:inertia():y()/5, Prop:toWorld(vec( Radius,0,0)) + CMass) #North
+Prop:applyOffsetForce(-TarP *Prop:up() *Prop:inertia():y()/5, Prop:toWorld(vec(-Radius,0,0)) + CMass) #South
+Prop:applyOffsetForce( TarR *Prop:up() *Prop:inertia():x()/5, Prop:toWorld(vec(0,-Radius,0)) + CMass) #West
+Prop:applyOffsetForce(-TarR *Prop:up() *Prop:inertia():x()/5, Prop:toWorld(vec(0, Radius,0)) + CMass) #East
+Prop:applyOffsetForce( FLSide *PRight *YI *Prop:inertia():z()/10, Prop:toWorld(vec( Radius,-Radius,0)) + CMass) #Yaw
+Prop:applyOffsetForce(-FLSide *PRight *YI *Prop:inertia():z()/10, Prop:toWorld(vec(-Radius, Radius,0)) + CMass) #Yaw
+
+#Extra Props for thrust
+if(Prop2) {
+Weight2 = Prop2:mass() * 0.8
+Radius2 = Prop2:radius() * RadiusModifier   
+CMass2 = Prop2:massCenterL()
+Prop2:applyForce(vec(0,0,-ZThrust) *Weight2*4) #Primary Z
+Prop2:applyForce(PForward * -Rear * Weight2/2) #Rear, handles movement and friction
+Prop2:applyForce(PRight   * Right * Weight2/2) #Right, handles friction
+Prop2:applyOffsetForce( TarP *Prop2:up() *Prop2:inertia():y()/5, Prop2:toWorld(vec( Radius2,0,0)) + CMass2) #North
+Prop2:applyOffsetForce(-TarP *Prop2:up() *Prop2:inertia():y()/5, Prop2:toWorld(vec(-Radius2,0,0)) + CMass2) #South
+Prop2:applyOffsetForce( TarR *Prop2:up() *Prop2:inertia():x()/5, Prop2:toWorld(vec(0,-Radius2,0)) + CMass2) #West
+Prop2:applyOffsetForce(-TarR *Prop2:up() *Prop2:inertia():x()/5, Prop2:toWorld(vec(0, Radius2,0)) + CMass2) #East
+Prop2:applyOffsetForce( FLSide *PRight *YI *Prop2:inertia():z()/10, Prop2:toWorld(vec( Radius2,-Radius2,0)) + CMass2) #Yaw
+Prop2:applyOffsetForce(-FLSide *PRight *YI *Prop2:inertia():z()/10, Prop2:toWorld(vec(-Radius2, Radius2,0)) + CMass2) #Yaw
+} if(Prop3) {
+Weight3 = Prop3:mass() * 0.8
+Radius3 = Prop3:radius() * RadiusModifier
+CMass3 = Prop3:massCenterL()
+Prop3:applyForce(vec(0,0,-ZThrust) *Weight3*4) #Primary Z
+Prop3:applyForce(PForward * -Rear * Weight3/2) #Rear, handles movement and friction
+Prop3:applyForce(PRight   * Right * Weight3/2) #Right, handles friction
+Prop3:applyOffsetForce( TarP *Prop2:up() *Prop3:inertia():y()/5, Prop3:toWorld(vec( Radius3,0,0)) + CMass3) #North
+Prop3:applyOffsetForce(-TarP *Prop2:up() *Prop3:inertia():y()/5, Prop3:toWorld(vec(-Radius3,0,0)) + CMass3) #South
+Prop3:applyOffsetForce( TarR *Prop2:up() *Prop3:inertia():x()/5, Prop3:toWorld(vec(0,-Radius3,0)) + CMass3) #West
+Prop3:applyOffsetForce(-TarR *Prop2:up() *Prop3:inertia():x()/5, Prop3:toWorld(vec(0, Radius3,0)) + CMass3) #East
+Prop3:applyOffsetForce( FLSide *PRight *YI *Prop3:inertia():z()/10, Prop3:toWorld(vec( Radius3,-Radius3,0)) + CMass3) #Yaw
+Prop3:applyOffsetForce(-FLSide *PRight *YI *Prop3:inertia():z()/10, Prop3:toWorld(vec(-Radius3, Radius3,0)) + CMass3) #Yaw
+} if(Prop4) {
+Weight4 = Prop4:mass() * 0.8
+Radius4 = Prop4:radius() * RadiusModifier
+CMass4 = Prop4:massCenterL()
+Prop4:applyForce(vec(0,0,-ZThrust) *Weight4*4) #Primary Z
+Prop4:applyForce(PForward * -Rear * Weight4/2) #Rear, handles movement and friction
+Prop4:applyForce(PRight   * Right * Weight4/2) #Right, handles friction
+Prop4:applyOffsetForce( TarP *Prop4:up() *Prop4:inertia():y()/5, Prop4:toWorld(vec( Radius4,0,0)) + CMass4) #North
+Prop4:applyOffsetForce(-TarP *Prop4:up() *Prop4:inertia():y()/5, Prop4:toWorld(vec(-Radius4,0,0)) + CMass4) #South
+Prop4:applyOffsetForce( TarR *Prop4:up() *Prop4:inertia():x()/5, Prop4:toWorld(vec(0,-Radius4,0)) + CMass4) #West
+Prop4:applyOffsetForce(-TarR *Prop4:up() *Prop4:inertia():x()/5, Prop4:toWorld(vec(0, Radius4,0)) + CMass4) #East
+Prop4:applyOffsetForce( FLSide *PRight *YI *Prop4:inertia():z()/10, Prop4:toWorld(vec( Radius4,-Radius4,0)) + CMass4) #Yaw
+Prop4:applyOffsetForce(-FLSide *PRight *YI *Prop4:inertia():z()/10, Prop4:toWorld(vec(-Radius4, Radius4,0)) + CMass4) #Yaw}
+} if(Prop5) {
+Weight5 = Prop5:mass() * 0.8
+Radius5 = Prop5:radius() * RadiusModifier
+CMass5 = Prop5:massCenterL()
+Prop5:applyForce(vec(0,0,-ZThrust) *Weight5*4) #Primary Z
+Prop5:applyForce(PForward * -Rear * Weight5/2) #Rear, handles movement and friction
+Prop5:applyForce(PRight   * Right * Weight5/2) #Right, handles friction
+Prop5:applyOffsetForce( TarP *Prop5:up() *Prop5:inertia():y()/5, Prop5:toWorld(vec( Radius5,0,0)) + CMass5) #North
+Prop5:applyOffsetForce(-TarP *Prop5:up() *Prop5:inertia():y()/5, Prop5:toWorld(vec(-Radius5,0,0)) + CMass5) #South
+Prop5:applyOffsetForce( TarR *Prop5:up() *Prop5:inertia():x()/5, Prop5:toWorld(vec(0,-Radius5,0)) + CMass5) #West
+Prop5:applyOffsetForce(-TarR *Prop5:up() *Prop5:inertia():x()/5, Prop5:toWorld(vec(0, Radius5,0)) + CMass5) #East
+Prop5:applyOffsetForce( FLSide *PRight *YI *Prop5:inertia():z()/10, Prop5:toWorld(vec( Radius5,-Radius5,0)) + CMass5) #Yaw
+Prop5:applyOffsetForce(-FLSide *PRight *YI *Prop5:inertia():z()/10, Prop5:toWorld(vec(-Radius5, Radius5,0)) + CMass5) #Yaw}
+}
+}
